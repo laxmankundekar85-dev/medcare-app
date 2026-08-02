@@ -76,11 +76,13 @@ export default function MedcareApp() {
               <SidebarItem icon={<Home size={20}/>} label="Dashboard" onClick={() => navigateTo('dashboard')} active={currentView === 'dashboard'} />
               <SidebarItem icon={<Pill size={20}/>} label="Medications" onClick={() => navigateTo('medications')} active={currentView === 'medications'} />
               <SidebarItem icon={<Syringe size={20}/>} label="Injections" onClick={() => navigateTo('injections')} active={currentView === 'injections'} />
-              <SidebarItem icon={<Activity size={20}/>} label="Previous Diseases" onClick={() => navigateTo('records')} active={currentView === 'records'} />
-              <SidebarItem icon={<FileText size={20}/>} label="Report" onClick={() => navigateTo('records')} />
-              <SidebarItem icon={<Calendar size={20}/>} label="Appointments" onClick={() => navigateTo('appointments')} />
-              <SidebarItem icon={<FileClock size={20}/>} label="Alarms" onClick={() => navigateTo('alarms')} active={currentView === 'alarms'} />
+              
+              {/* Correctly points to 'diseases' view */}
               <SidebarItem icon={<Activity size={20}/>} label="Previous Diseases" onClick={() => navigateTo('diseases')} active={currentView === 'diseases'} />
+              
+              <SidebarItem icon={<FileText size={20}/>} label="Report" onClick={() => navigateTo('records')} active={currentView === 'records'} />
+              <SidebarItem icon={<Calendar size={20}/>} label="Appointments" onClick={() => navigateTo('appointments')} active={currentView === 'appointments'} />
+              <SidebarItem icon={<FileClock size={20}/>} label="Alarms" onClick={() => navigateTo('alarms')} active={currentView === 'alarms'} />
               
               <div className="pt-6 mt-6 border-t border-slate-200 space-y-2">
                 <SidebarItem icon={<User size={20}/>} label="Profile" onClick={() => navigateTo('profile')} active={currentView === 'profile'} />
@@ -108,9 +110,9 @@ export default function MedcareApp() {
         {currentView === 'medications' && <Medications />}
         {currentView === 'injections' && <Injections />}
         {currentView === 'records' && <Records />}
+        {currentView === 'diseases' && <PreviousDiseases />}
         {currentView === 'profile' && <Profile onLogout={() => navigateTo('login')} />}
         {currentView === 'settings' && <Settings onLogout={() => navigateTo('login')} />}
-        {currentView === 'diseases' && <PreviousDiseases />}
       </main>
 
       {/* Bottom Navigation */}
