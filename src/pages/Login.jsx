@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { BriefcaseMedical, Mail, Lock, Eye, EyeOff, LogOut } from 'lucide-react';
 
 export default function Login({ onLogin }) {
   const [isRegistering, setIsRegistering] = useState(false);
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
     // Form Validation
-    if (!email || !password) {
+    if (!email || !password || (isRegistering && !fullName)) {
       setError('Please fill in all required fields.');
       return;
     }
@@ -29,12 +31,38 @@ export default function Login({ onLogin }) {
       return;
     }
 
-    // Trigger successful login/register transition
-    onLogin();
+    try {
+      if (isRegistering) {
+        // Call Backend Register API
+        await axios.post('http://localhost:5000/api/auth/register', {
+          fullName,
+          email,
+          password
+        });
+        
+        alert('Registration successful! Please sign in.');
+        setIsRegistering(false);
+        setPassword('');
+      } else {
+        // Call Backend Login API
+        const response = await axios.post('http://localhost:5000/api/auth/login', {
+          email,
+          password
+        });
+
+        // Save token and user details to localStorage
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+
+        // Trigger successful login transition in parent component
+        onLogin();
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || err.response?.data?.error || 'An error occurred during authentication.');
+    }
   };
 
   const handleGoogleLogin = () => {
-    // Simulate successful Google authentication
     onLogin();
   };
 
@@ -61,6 +89,20 @@ export default function Login({ onLogin }) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {isRegistering && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Full Name</label>
+              <input 
+                type="text" 
+                required
+                placeholder="Laxman Babu" 
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600 text-sm" 
+              />
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium mb-1">Email Address</label>
             <div className="relative">
