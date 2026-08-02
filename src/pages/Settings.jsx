@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function Settings() {
+export default function Settings({ onLogout }) {
   const [account, setAccount] = useState({
     name: 'Laxman Babu Kundekar',
     role: 'Engineering Student & Patient'
@@ -180,7 +180,7 @@ export default function Settings() {
 
       {/* Sign Out Button */}
       <button 
-        onClick={() => alert('Signed out successfully. Redirecting to login...')}
+        onClick={onLogout}
         className="w-full bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 font-semibold py-4 rounded-3xl transition flex items-center justify-center gap-2 text-sm shadow-sm mb-8"
       >
         <span>🚪</span> Sign Out
