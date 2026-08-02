@@ -24,9 +24,28 @@ export default function MedcareApp() {
   const [currentView, setCurrentView] = useState('login');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Notification States
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [hasUnread, setHasUnread] = useState(true);
+  const [notifications, setNotifications] = useState([
+    { id: 1, title: 'Medication Reminder', desc: 'Time to take Metformin 500mg', time: '10m ago' },
+    { id: 2, title: 'Appointment Confirmed', desc: 'Dr. Alex River on Aug 12, 2026', time: '1h ago' },
+    { id: 3, title: 'Health Report Ready', desc: 'Your weekly progress report is available', time: '1d ago' }
+  ]);
+
+  const handleOpenNotifications = () => {
+    setShowNotifications(!showNotifications);
+    setHasUnread(false);
+  };
+
+  const handleClearNotifications = () => {
+    setNotifications([]);
+  };
+
   const navigateTo = (view) => {
     setCurrentView(view);
     setIsSidebarOpen(false);
+    setShowNotifications(false);
   };
 
   if (currentView === 'login') {
@@ -34,24 +53,60 @@ export default function MedcareApp() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20">
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20 relative">
       {/* Top Header */}
-      <header className="flex items-center justify-between p-4 bg-slate-50 sticky top-0 z-10">
+      <header className="flex items-center justify-between p-4 bg-slate-50 sticky top-0 z-30 border-b border-slate-100">
         <div className="flex items-center gap-3">
           <button onClick={() => setIsSidebarOpen(true)} className="p-1 text-teal-800">
             <Menu size={24} />
           </button>
           <h1 className="text-xl font-bold text-teal-800">Medcare</h1>
         </div>
+
         {currentView === 'profile' || currentView === 'settings' ? (
            <div className="w-8 h-8 rounded-full bg-slate-300 overflow-hidden">
              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex" alt="Avatar" />
            </div>
         ) : (
-          <button className="relative p-1 text-teal-800">
-            <Bell size={24} />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
+          <div className="relative">
+            {/* Clickable Notification Button */}
+            <button onClick={handleOpenNotifications} className="relative p-1 text-teal-800 hover:bg-teal-50 rounded-full transition">
+              <Bell size={24} />
+              {hasUnread && (
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-50"></span>
+              )}
+            </button>
+
+            {/* Notification Dropdown Box */}
+            {showNotifications && (
+              <div className="absolute right-0 mt-3 w-80 bg-white border border-slate-200 rounded-3xl shadow-2xl p-4 z-50 text-left">
+                <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100">
+                  <h3 className="font-bold text-sm text-slate-900">Notifications</h3>
+                  {notifications.length > 0 && (
+                    <button onClick={handleClearNotifications} className="text-xs text-teal-700 font-semibold hover:underline">
+                      Clear all
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2.5 max-h-72 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <p className="text-xs text-slate-400 text-center py-6">No new notifications</p>
+                  ) : (
+                    notifications.map(n => (
+                      <div key={n.id} className="bg-slate-50 p-3 rounded-2xl border border-slate-100 hover:bg-teal-50/50 transition">
+                        <div className="flex justify-between items-start">
+                          <h4 className="font-bold text-xs text-slate-900">{n.title}</h4>
+                          <span className="text-[10px] text-slate-400">{n.time}</span>
+                        </div>
+                        <p className="text-xs text-slate-600 mt-1">{n.desc}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </header>
 
@@ -76,10 +131,7 @@ export default function MedcareApp() {
               <SidebarItem icon={<Home size={20}/>} label="Dashboard" onClick={() => navigateTo('dashboard')} active={currentView === 'dashboard'} />
               <SidebarItem icon={<Pill size={20}/>} label="Medications" onClick={() => navigateTo('medications')} active={currentView === 'medications'} />
               <SidebarItem icon={<Syringe size={20}/>} label="Injections" onClick={() => navigateTo('injections')} active={currentView === 'injections'} />
-              
-              {/* Correctly points to 'diseases' view */}
               <SidebarItem icon={<Activity size={20}/>} label="Previous Diseases" onClick={() => navigateTo('diseases')} active={currentView === 'diseases'} />
-              
               <SidebarItem icon={<FileText size={20}/>} label="Report" onClick={() => navigateTo('records')} active={currentView === 'records'} />
               <SidebarItem icon={<Calendar size={20}/>} label="Appointments" onClick={() => navigateTo('appointments')} active={currentView === 'appointments'} />
               <SidebarItem icon={<FileClock size={20}/>} label="Alarms" onClick={() => navigateTo('alarms')} active={currentView === 'alarms'} />
