@@ -9,6 +9,13 @@ export default function Dashboard() {
   const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
   const [isFabMenuOpen, setIsFabMenuOpen] = useState(false);
 
+  // Profile state for name and patient ID
+  const [patientName, setPatientName] = useState('Laxman');
+  const [patientId, setPatientId] = useState('#MC8829');
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [tempName, setTempName] = useState(patientName);
+  const [tempId, setTempId] = useState(patientId);
+
   // Calculate dynamic BMI: weight (kg) / [height (m)]^2
   const heightInMeters = height / 100;
   const bmi = (weight / (heightInMeters * heightInMeters)).toFixed(1);
@@ -22,14 +29,32 @@ export default function Dashboard() {
       alert('Opening new appointment scheduler...');
     } else if (action === 'record') {
       alert('Redirecting to upload/add record...');
+    } else if (action === 'profile') {
+      setTempName(patientName);
+      setTempId(patientId);
+      setIsProfileModalOpen(true);
     }
+  };
+
+  const handleSaveProfile = (e) => {
+    e.preventDefault();
+    if (!tempName || !tempId) return;
+    setPatientName(tempName);
+    setPatientId(tempId);
+    setIsProfileModalOpen(false);
   };
 
   return (
     <div className="space-y-6 pb-24 relative" onClick={() => setIsFabMenuOpen(false)}>
-      <div>
-        <h2 className="text-3xl font-bold">Good morning, Laxman.</h2>
-        <p className="text-slate-500">Your vitals look great today.</p>
+      {/* Clickable Header Section to open Profile Edit Modal */}
+      <div className="flex justify-between items-start bg-white p-5 rounded-3xl border border-slate-100 shadow-sm cursor-pointer hover:border-teal-700 transition" onClick={() => { setTempName(patientName); setTempId(patientId); setIsProfileModalOpen(true); }}>
+        <div>
+          <h2 className="text-3xl font-bold">Good morning, {patientName}.</h2>
+          <p className="text-slate-500 mt-0.5">Your vitals look great today. <span className="text-xs text-teal-700 font-semibold bg-teal-50 px-2 py-0.5 rounded-md ml-1">{patientId}</span></p>
+        </div>
+        <span className="text-xs bg-teal-50 hover:bg-teal-100 text-teal-800 font-semibold px-3 py-1.5 rounded-xl transition">
+          Edit Profile
+        </span>
       </div>
 
       <div>
@@ -72,9 +97,15 @@ export default function Dashboard() {
       </div>
 
       {/* Floating Action Button & Popup Menu */}
-      <div className="fixed bottom-24 right-6 z-50">
+      <div className="fixed bottom-24 right-6 z-50" onClick={(e) => e.stopPropagation()}>
         {isFabMenuOpen && (
-          <div className="absolute bottom-16 right-0 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 w-48 space-y-1 mb-2">
+          <div className="absolute bottom-16 right-0 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 w-52 space-y-1 mb-2">
+            <button 
+              onClick={() => handleQuickAction('profile')}
+              className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-teal-50 hover:text-teal-800 rounded-xl transition flex items-center gap-2"
+            >
+              <span>👤 Edit Profile & ID</span>
+            </button>
             <button 
               onClick={() => handleQuickAction('vitals')}
               className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-teal-50 hover:text-teal-800 rounded-xl transition flex items-center gap-2"
@@ -97,7 +128,7 @@ export default function Dashboard() {
         )}
 
         <button 
-          onClick={(e) => { e.stopPropagation(); setIsFabMenuOpen(!isFabMenuOpen); }}
+          onClick={() => setIsFabMenuOpen(!isFabMenuOpen)}
           className="w-14 h-14 bg-teal-800 hover:bg-teal-900 text-white rounded-full flex items-center justify-center shadow-lg transition transform hover:scale-105 active:scale-95"
         >
           <Plus size={24} className={`transition-transform duration-200 ${isFabMenuOpen ? 'rotate-45' : ''}`} />
@@ -106,8 +137,8 @@ export default function Dashboard() {
 
       {/* Edit Vitals Modal */}
       {isVitalsModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-gray-900">Update Vitals</h3>
               <button 
@@ -150,6 +181,63 @@ export default function Dashboard() {
                 Save Changes
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Profile & ID Modal */}
+      {isProfileModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Edit Profile</h3>
+              <button 
+                onClick={() => setIsProfileModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 font-bold text-xl"
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Patient Name</label>
+                <input
+                  type="text"
+                  required
+                  value={tempName}
+                  onChange={(e) => setTempName(e.target.value)}
+                  className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Patient ID</label>
+                <input
+                  type="text"
+                  required
+                  value={tempId}
+                  onChange={(e) => setTempId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700 text-sm"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsProfileModalOpen(false)}
+                  className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2.5 rounded-xl font-medium transition text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow text-sm"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

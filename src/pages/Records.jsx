@@ -134,7 +134,7 @@ export default function Records() {
   );
 
   return (
-    <div className="p-8 max-w-4xl mx-auto pb-24 relative" onClick={() => setActiveMenuId(null)}>
+    <div className="p-4 sm:p-8 max-w-4xl mx-auto pb-24 relative" onClick={() => setActiveMenuId(null)}>
       {/* Hidden Native File Input for Mobile/PC Uploads */}
       <input 
         type="file" 
@@ -144,26 +144,28 @@ export default function Records() {
         className="hidden" 
       />
 
-      {/* Header & Add Button */}
-      <div className="flex justify-between items-start mb-6">
+      {/* Header & Perfectly Arranged Buttons for Mobile/Desktop */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Records</h1>
-          <p className="text-gray-500 mt-1">View and download your clinical documents and test results.</p>
+          <p className="text-gray-500 mt-1 text-sm">View and download your clinical documents and test results.</p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Upload File Button directly opens mobile file picker */}
+        
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {/* Upload File Button */}
           <button
             onClick={(e) => { e.stopPropagation(); fileInputRef.current.click(); }}
-            className="bg-teal-700 hover:bg-teal-800 text-white font-medium px-4 py-2.5 rounded-lg shadow transition duration-200 flex items-center gap-2 text-sm"
+            className="flex-1 sm:flex-initial bg-teal-700 hover:bg-teal-800 text-white font-medium px-4 py-2.5 rounded-xl shadow transition duration-200 flex items-center justify-center gap-2 text-xs sm:text-sm whitespace-nowrap"
           >
-            <span>📎 Upload File / PDF</span>
+            <span>📎 Upload File</span>
           </button>
 
+          {/* Add Record Button */}
           <button
             onClick={(e) => { e.stopPropagation(); setSelectedFile(null); setIsModalOpen(true); }}
-            className="bg-teal-800 hover:bg-teal-900 text-white font-medium px-4 py-2.5 rounded-lg shadow transition duration-200 flex items-center gap-2 text-sm"
+            className="flex-1 sm:flex-initial bg-teal-800 hover:bg-teal-900 text-white font-medium px-4 py-2.5 rounded-xl shadow transition duration-200 flex items-center justify-center gap-2 text-xs sm:text-sm whitespace-nowrap"
           >
-            <span className="text-lg leading-none">+</span> Add Record
+            <span className="text-base leading-none">+</span> Add Record
           </button>
         </div>
       </div>
@@ -178,7 +180,7 @@ export default function Records() {
           placeholder="Search reports, doctors, or labs..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-white border border-gray-200 rounded-2xl pl-12 pr-12 py-3.5 text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-700"
+          className="w-full bg-white border border-gray-200 rounded-2xl pl-12 pr-12 py-3.5 text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-700 text-sm"
         />
         <button 
           onClick={() => alert('Filter options opened')} 
