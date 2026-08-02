@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { BriefcaseMedical, Mail, Lock, Eye, EyeOff, LogOut } from 'lucide-react';
 
+const API_BASE_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:5000' 
+  : 'https://medcare-app-qyao.onrender.com';
+
 export default function Login({ onLogin }) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [fullName, setFullName] = useState('');
@@ -33,8 +37,8 @@ export default function Login({ onLogin }) {
 
     try {
       if (isRegistering) {
-        // Call Backend Register API using relative path (leveraging proxy or same origin)
-        await axios.post('/api/auth/register', {
+        // Call Backend Register API using dynamic API base URL
+        await axios.post(`${API_BASE_URL}/api/auth/register`, {
           fullName,
           email,
           password
@@ -46,8 +50,8 @@ export default function Login({ onLogin }) {
         setIsRegistering(false);
         setPassword('');
       } else {
-        // Call Backend Login API using relative path
-        const response = await axios.post('/api/auth/login', {
+        // Call Backend Login API using dynamic API base URL
+        const response = await axios.post(`${API_BASE_URL}/api/auth/login`, {
           email,
           password
         }, {
