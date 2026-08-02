@@ -1,35 +1,290 @@
-import React from 'react';
-import { LogOut } from 'lucide-react';
+import React, { useState } from 'react';
 
-export default function Profile({ onLogout }) {
+export default function Profile() {
+  const [profile, setProfile] = useState({
+    name: 'Laxman Babu Kundekar',
+    patientId: '#MC-98442',
+    bloodGroup: 'O+',
+    age: '20',
+    weight: '64',
+    email: 'laxman.kundekar@healthmail.com',
+    phone: '+91 98765 43210',
+    address: 'VIVA Institute of Technology, Virar, Mumbai'
+  });
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [activeSubView, setActiveSubView] = useState(null);
+
+  // Edit form state
+  const [editField, setEditField] = useState('');
+  const [editVal, setEditVal] = useState('');
+  const [modalTitle, setModalTitle] = useState('');
+
+  const openEditModal = (fieldKey, title) => {
+    setEditField(fieldKey);
+    setEditVal(profile[fieldKey]);
+    setModalTitle(title);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveProfile = (e) => {
+    e.preventDefault();
+    setProfile({ ...profile, [editField]: editVal });
+    setIsEditModalOpen(false);
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="bg-teal-800 h-32 rounded-t-3xl relative mb-12">
-         <div className="absolute -bottom-10 left-1/2 transform -translate-x-1/2">
-            <div className="w-24 h-24 rounded-full border-4 border-slate-50 bg-slate-300 overflow-hidden relative">
-               <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex" alt="User" className="w-full h-full object-cover" />
-            </div>
-         </div>
+    <div className="p-6 max-w-4xl mx-auto pb-32">
+      {/* Top Header */}
+      <div className="flex justify-between items-center mb-6">
+        <button onClick={() => alert('Navigating back')} className="text-gray-700 font-bold text-lg">
+          ←
+        </button>
+        <h1 className="text-xl font-bold text-gray-900">Profile</h1>
+        <button 
+          onClick={() => openEditModal('name', 'Edit Name')}
+          className="text-gray-700 hover:text-teal-800 transition"
+          title="Edit Profile"
+        >
+          ✏️
+        </button>
       </div>
-      <div className="text-center">
-        <h2 className="text-2xl font-bold">Alex River</h2>
-        <p className="text-sm text-slate-500">Patient ID: #MC-98442</p>
-      </div>
-      
-      <div className="flex gap-4 justify-center">
-        <div className="border border-slate-200 bg-white rounded-xl p-4 text-center w-24">
-           <p className="text-xs text-slate-500 mb-1">Blood Group</p>
-           <p className="font-bold text-teal-800 text-lg">O+</p>
+
+      {/* Banner & Avatar */}
+      <div className="relative mb-16">
+        <div className="bg-teal-700 h-32 rounded-3xl relative overflow-hidden flex items-center justify-center">
+          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]"></div>
         </div>
-        <div className="border border-slate-200 bg-white rounded-xl p-4 text-center w-24">
-           <p className="text-xs text-slate-500 mb-1">Age</p>
-           <p className="font-bold text-teal-800 text-lg">29</p>
+        <div className="absolute -bottom-10 left-1/2 transform -translate-x-1/2 flex flex-col items-center">
+          <div className="relative">
+            <img 
+              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80" 
+              alt="Profile" 
+              className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md"
+            />
+            <span className="absolute bottom-0 right-0 bg-teal-700 text-white p-1 rounded-full text-xs shadow">
+              ✓
+            </span>
+          </div>
         </div>
       </div>
 
-      <button onClick={onLogout} className="w-full bg-red-100 text-red-600 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 mt-8">
-         <LogOut size={20} /> Logout Account
-      </button>
+      {/* Name & ID */}
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">{profile.name}</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Patient ID: {profile.patientId}</p>
+      </div>
+
+      {/* Stat Cards */}
+      <div className="grid grid-cols-3 gap-3 mb-8">
+        <div 
+          onClick={() => openEditModal('bloodGroup', 'Blood Group')}
+          className="bg-white border border-gray-100 rounded-3xl p-4 text-center shadow-sm cursor-pointer hover:border-teal-300 transition"
+        >
+          <p className="text-xs text-gray-400 font-medium mb-1">Blood Group</p>
+          <h3 className="text-xl font-bold text-teal-800">{profile.bloodGroup}</h3>
+        </div>
+        <div 
+          onClick={() => openEditModal('age', 'Age')}
+          className="bg-white border border-gray-100 rounded-3xl p-4 text-center shadow-sm cursor-pointer hover:border-teal-300 transition"
+        >
+          <p className="text-xs text-gray-400 font-medium mb-1">Age</p>
+          <h3 className="text-xl font-bold text-teal-800">{profile.age}</h3>
+        </div>
+        <div 
+          onClick={() => openEditModal('weight', 'Weight')}
+          className="bg-white border border-gray-100 rounded-3xl p-4 text-center shadow-sm cursor-pointer hover:border-teal-300 transition"
+        >
+          <p className="text-xs text-gray-400 font-medium mb-1">Weight</p>
+          <h3 className="text-xl font-bold text-teal-800">{profile.weight}<span className="text-xs font-normal text-gray-400">kg</span></h3>
+        </div>
+      </div>
+
+      {/* Personal Information */}
+      <div className="mb-8">
+        <h3 className="text-xs font-bold text-gray-400 tracking-wider mb-3">PERSONAL INFORMATION</h3>
+        <div className="bg-white border border-gray-100 rounded-3xl shadow-sm divide-y divide-gray-100">
+          <div 
+            onClick={() => openEditModal('email', 'Email Address')}
+            className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition rounded-t-3xl"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-teal-700 text-lg">✉️</span>
+              <div>
+                <p className="text-xs text-gray-400">Email</p>
+                <p className="text-sm font-medium text-gray-800">{profile.email}</p>
+              </div>
+            </div>
+            <span className="text-xs text-teal-800 font-semibold">Edit</span>
+          </div>
+
+          <div 
+            onClick={() => openEditModal('phone', 'Phone Number')}
+            className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-teal-700 text-lg">📞</span>
+              <div>
+                <p className="text-xs text-gray-400">Phone</p>
+                <p className="text-sm font-medium text-gray-800">{profile.phone}</p>
+              </div>
+            </div>
+            <span className="text-xs text-teal-800 font-semibold">Edit</span>
+          </div>
+
+          <div 
+            onClick={() => openEditModal('address', 'Residential Address')}
+            className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition rounded-b-3xl"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-teal-700 text-lg">📍</span>
+              <div>
+                <p className="text-xs text-gray-400">Address</p>
+                <p className="text-sm font-medium text-gray-800">{profile.address}</p>
+              </div>
+            </div>
+            <span className="text-xs text-teal-800 font-semibold">Edit</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Medical Summary */}
+      <div className="mb-8">
+        <h3 className="text-xs font-bold text-gray-400 tracking-wider mb-3">MEDICAL SUMMARY</h3>
+        <div className="space-y-3">
+          <div 
+            onClick={() => setActiveSubView('Last Health Checkup details: Completed successfully.')}
+            className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm flex justify-between items-center cursor-pointer hover:border-teal-300 transition"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-teal-50 text-teal-700 rounded-2xl">📋</div>
+              <div>
+                <h4 className="font-bold text-gray-900 text-sm">Last Health Checkup</h4>
+                <p className="text-xs text-gray-400">15 October 2023 • Dr. Alex River</p>
+              </div>
+            </div>
+            <span className="text-gray-400 font-bold">›</span>
+          </div>
+
+          <div 
+            onClick={() => setActiveSubView('Vaccination Status: Fully Vaccinated against standard pathogens.')}
+            className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm flex justify-between items-center cursor-pointer hover:border-teal-300 transition"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-teal-700 text-white rounded-2xl">💉</div>
+              <div>
+                <h4 className="font-bold text-gray-900 text-sm">Vaccination Status</h4>
+                <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">● Fully Vaccinated</p>
+              </div>
+            </div>
+            <span className="text-gray-400 font-bold">›</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Settings & Actions */}
+      <div className="space-y-3 mb-8">
+        <div 
+          onClick={() => setActiveSubView('Privacy & Security: Your data is end-to-end encrypted.')}
+          className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm flex justify-between items-center cursor-pointer hover:border-teal-300 transition"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-gray-600 text-lg">🛡️</span>
+            <span className="font-medium text-gray-900 text-sm">Privacy & Security</span>
+          </div>
+          <span className="text-gray-400 font-bold">›</span>
+        </div>
+
+        <div 
+          onClick={() => setActiveSubView('Notification Settings: Push notifications and SMS alerts active.')}
+          className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm flex justify-between items-center cursor-pointer hover:border-teal-300 transition"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-gray-600 text-lg">🔔</span>
+            <span className="font-medium text-gray-900 text-sm">Notification Settings</span>
+          </div>
+          <span className="text-gray-400 font-bold">›</span>
+        </div>
+
+        <button 
+          onClick={() => alert('Logged out successfully. Redirecting to login...')}
+          className="w-full bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 font-medium py-4 rounded-3xl transition flex items-center justify-center gap-2 text-sm shadow-sm"
+        >
+          <span>🚪</span> Logout Account
+        </button>
+      </div>
+
+      {/* Edit Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-900">{modalTitle}</h3>
+              <button 
+                onClick={() => setIsEditModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 font-bold text-xl"
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New Value</label>
+                <input
+                  type="text"
+                  required
+                  value={editVal}
+                  onChange={(e) => setEditVal(e.target.value)}
+                  className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2.5 rounded-xl font-medium transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Info Modal */}
+      {activeSubView && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Details</h3>
+              <button 
+                onClick={() => setActiveSubView(null)}
+                className="text-gray-400 hover:text-gray-600 font-bold text-xl"
+              >
+                &times;
+              </button>
+            </div>
+            <p className="text-gray-700 text-sm mb-6 leading-relaxed bg-teal-50 p-4 rounded-2xl border border-teal-100">
+              {activeSubView}
+            </p>
+            <button
+              onClick={() => setActiveSubView(null)}
+              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
