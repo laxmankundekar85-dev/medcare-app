@@ -1,7 +1,43 @@
-import React from 'react';
-import { BriefcaseMedical, Mail, Lock, Eye, LogOut } from 'lucide-react';
+import React, { useState } from 'react';
+import { BriefcaseMedical, Mail, Lock, Eye, EyeOff, LogOut } from 'lucide-react';
 
 export default function Login({ onLogin }) {
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setError('');
+
+    // Form Validation
+    if (!email || !password) {
+      setError('Please fill in all required fields.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+
+    // Trigger successful login/register transition
+    onLogin();
+  };
+
+  const handleGoogleLogin = () => {
+    // Simulate successful Google authentication
+    onLogin();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-teal-50 to-slate-100 flex flex-col items-center justify-center p-6 font-sans">
       <div className="w-16 h-16 bg-teal-100 rounded-2xl flex items-center justify-center mb-4">
@@ -11,46 +47,116 @@ export default function Login({ onLogin }) {
       <p className="text-xs tracking-widest text-slate-500 mb-10">CLINICAL EXCELLENCE • PERSONAL CARE</p>
 
       <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-sm">
-        <h2 className="text-2xl font-bold mb-2">Welcome Back</h2>
-        <p className="text-slate-500 mb-6">Please sign in to access your dashboard.</p>
+        <h2 className="text-2xl font-bold mb-2">
+          {isRegistering ? 'Create Account' : 'Welcome Back'}
+        </h2>
+        <p className="text-slate-500 mb-6 text-sm">
+          {isRegistering ? 'Sign up to start tracking your health records.' : 'Please sign in to access your dashboard.'}
+        </p>
 
-        <div className="space-y-4">
+        {error && (
+          <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-600 text-xs p-3 rounded-xl font-medium">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Email Address</label>
             <div className="relative">
-              <Mail className="absolute left-3 top-3 text-slate-400" size={20} />
-              <input type="email" placeholder="alex@example.com" className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600" />
+              <Mail className="absolute left-3 top-3.5 text-slate-400" size={20} />
+              <input 
+                type="email" 
+                required
+                placeholder="alex@example.com" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600 text-sm" 
+              />
             </div>
           </div>
+
           <div>
             <div className="flex justify-between items-center mb-1">
               <label className="block text-sm font-medium">Password</label>
-              <a href="#" className="text-xs text-teal-700">Forgot Password?</a>
+              {!isRegistering && (
+                <button 
+                  type="button" 
+                  onClick={() => alert('Password reset instructions sent to your email.')}
+                  className="text-xs text-teal-700 font-semibold hover:underline"
+                >
+                  Forgot Password?
+                </button>
+              )}
             </div>
             <div className="relative">
-              <Lock className="absolute left-3 top-3 text-slate-400" size={20} />
-              <input type="password" value="........" readOnly className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600" />
-              <Eye className="absolute right-3 top-3 text-slate-400" size={20} />
+              <Lock className="absolute left-3 top-3.5 text-slate-400" size={20} />
+              <input 
+                type={showPassword ? 'text' : 'password'} 
+                required
+                placeholder="••••••••" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600 text-sm" 
+              />
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
             </div>
           </div>
 
-          <button onClick={onLogin} className="w-full bg-teal-800 text-white py-3 rounded-xl font-medium mt-2 flex justify-center items-center gap-2">
-            Sign In <LogOut size={18} className="rotate-180" />
+          <button 
+            type="submit" 
+            className="w-full bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl font-medium mt-2 flex justify-center items-center gap-2 transition shadow-sm"
+          >
+            <span>{isRegistering ? 'Register Account' : 'Sign In'}</span> 
+            <LogOut size={18} className="rotate-180" />
           </button>
+        </form>
 
-          <div className="flex items-center gap-4 my-6 text-slate-400 text-sm">
-            <div className="flex-1 h-px bg-slate-200"></div>
-            OR
-            <div className="flex-1 h-px bg-slate-200"></div>
-          </div>
-
-          <button className="w-full bg-white border border-slate-200 py-3 rounded-xl font-medium flex justify-center items-center gap-2">
-            <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
-            Continue with Google
-          </button>
+        <div className="flex items-center gap-4 my-6 text-slate-400 text-sm">
+          <div className="flex-1 h-px bg-slate-200"></div>
+          OR
+          <div className="flex-1 h-px bg-slate-200"></div>
         </div>
+
+        <button 
+          type="button"
+          onClick={handleGoogleLogin}
+          className="w-full bg-white border border-slate-200 hover:bg-slate-50 py-3 rounded-xl font-medium flex justify-center items-center gap-2 transition text-sm text-slate-700"
+        >
+          <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
+          Continue with Google
+        </button>
       </div>
-      <p className="mt-8 text-slate-500">Don't have an account? <a href="#" className="text-teal-700 font-medium">Register</a></p>
+
+      <div className="mt-8 text-slate-500 text-sm">
+        {isRegistering ? (
+          <p>
+            Already have an account?{' '}
+            <button 
+              onClick={() => { setIsRegistering(false); setError(''); }} 
+              className="text-teal-700 font-medium hover:underline"
+            >
+              Sign In
+            </button>
+          </p>
+        ) : (
+          <p>
+            Don't have an account?{' '}
+            <button 
+              onClick={() => { setIsRegistering(true); setError(''); }} 
+              className="text-teal-700 font-medium hover:underline"
+            >
+              Register
+            </button>
+          </p>
+        )}
+      </div>
     </div>
   );
 }
