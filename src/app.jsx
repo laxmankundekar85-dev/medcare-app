@@ -18,6 +18,7 @@ import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Appointments from './pages/Appointments';
 import Alarms from './pages/Alarms';
+import PreviousDiseases from './pages/PreviousDiseases';
 
 export default function MedcareApp() {
   const [currentView, setCurrentView] = useState('login');
@@ -79,6 +80,7 @@ export default function MedcareApp() {
               <SidebarItem icon={<FileText size={20}/>} label="Report" onClick={() => navigateTo('records')} />
               <SidebarItem icon={<Calendar size={20}/>} label="Appointments" onClick={() => navigateTo('appointments')} />
               <SidebarItem icon={<FileClock size={20}/>} label="Alarms" onClick={() => navigateTo('alarms')} active={currentView === 'alarms'} />
+              <SidebarItem icon={<Activity size={20}/>} label="Previous Diseases" onClick={() => navigateTo('diseases')} active={currentView === 'diseases'} />
               
               <div className="pt-6 mt-6 border-t border-slate-200 space-y-2">
                 <SidebarItem icon={<User size={20}/>} label="Profile" onClick={() => navigateTo('profile')} active={currentView === 'profile'} />
@@ -108,6 +110,7 @@ export default function MedcareApp() {
         {currentView === 'records' && <Records />}
         {currentView === 'profile' && <Profile onLogout={() => navigateTo('login')} />}
         {currentView === 'settings' && <Settings onLogout={() => navigateTo('login')} />}
+        {currentView === 'diseases' && <PreviousDiseases />}
       </main>
 
       {/* Bottom Navigation */}
