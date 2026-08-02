@@ -13,12 +13,26 @@ export default function Profile() {
   });
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [activeSubView, setActiveSubView] = useState(null);
+  const [activeSubView, setActiveSubView] = useState(null); // 'medical', 'privacy', 'notifications'
 
   // Edit form state
   const [editField, setEditField] = useState('');
   const [editVal, setEditVal] = useState('');
   const [modalTitle, setModalTitle] = useState('');
+
+  // Interactive Settings Toggles State
+  const [notifSettings, setNotifSettings] = useState({
+    push: true,
+    sms: true,
+    emailAlerts: false,
+    reminders: true
+  });
+
+  const [privacySettings, setPrivacySettings] = useState({
+    biometric: true,
+    shareData: false,
+    twoFactor: true
+  });
 
   const openEditModal = (fieldKey, title) => {
     setEditField(fieldKey);
@@ -153,7 +167,7 @@ export default function Profile() {
         <h3 className="text-xs font-bold text-gray-400 tracking-wider mb-3">MEDICAL SUMMARY</h3>
         <div className="space-y-3">
           <div 
-            onClick={() => setActiveSubView('Last Health Checkup details: Completed successfully.')}
+            onClick={() => setActiveSubView('medical')}
             className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm flex justify-between items-center cursor-pointer hover:border-teal-300 transition"
           >
             <div className="flex items-center gap-3">
@@ -167,7 +181,7 @@ export default function Profile() {
           </div>
 
           <div 
-            onClick={() => setActiveSubView('Vaccination Status: Fully Vaccinated against standard pathogens.')}
+            onClick={() => setActiveSubView('medical')}
             className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm flex justify-between items-center cursor-pointer hover:border-teal-300 transition"
           >
             <div className="flex items-center gap-3">
@@ -185,7 +199,7 @@ export default function Profile() {
       {/* Settings & Actions */}
       <div className="space-y-3 mb-8">
         <div 
-          onClick={() => setActiveSubView('Privacy & Security: Your data is end-to-end encrypted.')}
+          onClick={() => setActiveSubView('privacy')}
           className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm flex justify-between items-center cursor-pointer hover:border-teal-300 transition"
         >
           <div className="flex items-center gap-3">
@@ -196,7 +210,7 @@ export default function Profile() {
         </div>
 
         <div 
-          onClick={() => setActiveSubView('Notification Settings: Push notifications and SMS alerts active.')}
+          onClick={() => setActiveSubView('notifications')}
           className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm flex justify-between items-center cursor-pointer hover:border-teal-300 transition"
         >
           <div className="flex items-center gap-3">
@@ -260,21 +274,121 @@ export default function Profile() {
         </div>
       )}
 
-      {/* Info Modal */}
-      {activeSubView && (
+      {/* Interactive Sub-Modals (Notifications, Privacy, Medical) */}
+      {activeSubView === 'notifications' && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-900">Details</h3>
-              <button 
-                onClick={() => setActiveSubView(null)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-xl"
-              >
-                &times;
-              </button>
+              <h3 className="text-xl font-bold text-gray-900">Notification Settings</h3>
+              <button onClick={() => setActiveSubView(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl">
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900">Push Notifications</h4>
+                  <p className="text-xs text-gray-500">Receive instant alerts for doses</p>
+                </div>
+                <button 
+                  onClick={() => setNotifSettings({...notifSettings, push: !notifSettings.push})}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition ${notifSettings.push ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl">
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900">SMS Alerts</h4>
+                  <p className="text-xs text-gray-500">Get text messages for appointments</p>
+                </div>
+                <button 
+                  onClick={() => setNotifSettings({...notifSettings, sms: !notifSettings.sms})}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition ${notifSettings.sms ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl">
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900">Email Summaries</h4>
+                  <p className="text-xs text-gray-500">Weekly health report updates</p>
+                </div>
+                <button 
+                  onClick={() => setNotifSettings({...notifSettings, emailAlerts: !notifSettings.emailAlerts})}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition ${notifSettings.emailAlerts ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setActiveSubView(null)}
+              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeSubView === 'privacy' && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Privacy & Security</h3>
+              <button onClick={() => setActiveSubView(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl">
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900">Biometric Lock</h4>
+                  <p className="text-xs text-gray-500">Require fingerprint/face ID</p>
+                </div>
+                <button 
+                  onClick={() => setPrivacySettings({...privacySettings, biometric: !privacySettings.biometric})}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition ${privacySettings.biometric ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl">
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900">Two-Factor Auth</h4>
+                  <p className="text-xs text-gray-500">Extra layer of account security</p>
+                </div>
+                <button 
+                  onClick={() => setPrivacySettings({...privacySettings, twoFactor: !privacySettings.twoFactor})}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition ${privacySettings.twoFactor ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setActiveSubView(null)}
+              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeSubView === 'medical' && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Medical Status Overview</h3>
+              <button onClick={() => setActiveSubView(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
             </div>
             <p className="text-gray-700 text-sm mb-6 leading-relaxed bg-teal-50 p-4 rounded-2xl border border-teal-100">
-              {activeSubView}
+              Your immunization records and last clinical checkup with Dr. Alex River are fully verified and up to date.
             </p>
             <button
               onClick={() => setActiveSubView(null)}
