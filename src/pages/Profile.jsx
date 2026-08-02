@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 
-export default function Profile() {
+// Notice the new onLogout prop here
+export default function Profile({ onLogout }) {
   const [profile, setProfile] = useState({
     name: 'Laxman Babu Kundekar',
     patientId: '#MC-98442',
@@ -245,8 +246,9 @@ export default function Profile() {
           <span className="text-gray-400 font-bold">›</span>
         </div>
 
+        {/* Updated Logout Button */}
         <button 
-          onClick={() => alert('Logged out successfully. Redirecting to login...')}
+          onClick={onLogout}
           className="w-full bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 font-medium py-4 rounded-3xl transition flex items-center justify-center gap-2 text-sm shadow-sm"
         >
           <span>🚪</span> Logout Account
