@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
 export default function Records() {
   const [records, setRecords] = useState([
@@ -58,8 +58,30 @@ export default function Records() {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('LAB RESULT');
   const [location, setLocation] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
 
-  // 1. Add Record Function
+  // Reference for hidden native file picker
+  const fileInputRef = useRef(null);
+
+  // 1. Handle native file selection from mobile device or PC
+  const handleFileSelected = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setSelectedFile(file);
+    // Automatically fill the title with the file name (without extension) if title is empty
+    const fileNameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+    setTitle(fileNameWithoutExt);
+    setLocation('Mobile Upload / Local File');
+    
+    // Open the modal so the user can review and finalize category/details
+    setIsModalOpen(true);
+    
+    // Reset file input value so selecting the same file again works
+    e.target.value = null;
+  };
+
+  // 2. Add Record Function (supports file/PDF attached)
   const handleAddRecord = (e) => {
     e.preventDefault();
     if (!title || !location) return;
@@ -71,33 +93,34 @@ export default function Records() {
       location,
       date: 'Just now',
       month: 'OCTOBER 2023',
-      icon: '📄',
+      icon: selectedFile?.type?.includes('pdf') ? '📄' : '📁',
       recentlyUpdated: true
     };
 
     setRecords([newRecord, ...records]);
     setTitle('');
     setLocation('');
+    setSelectedFile(null);
     setIsModalOpen(false);
   };
 
-  // 2. Delete Record Function
+  // 3. Delete Record Function
   const handleDelete = (id) => {
     setRecords(records.filter(r => r.id !== id));
     setActiveMenuId(null);
   };
 
-  // 3. Download Simulation Function
+  // 4. Download Simulation Function
   const handleDownload = (title) => {
     alert(`Downloading "${title}" report... Your file will be saved shortly.`);
   };
 
-  // 4. Mark All Read Function
+  // 5. Mark All Read Function
   const handleMarkAllRead = () => {
     alert('All clinical records marked as read.');
   };
 
-  // 5. Load Archive Function
+  // 6. Load Archive Function
   const handleLoadArchive = () => {
     setArchiveLoaded(true);
     alert('Archive successfully loaded with older medical documents.');
@@ -112,18 +135,37 @@ export default function Records() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto pb-24 relative" onClick={() => setActiveMenuId(null)}>
+      {/* Hidden Native File Input for Mobile/PC Uploads */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleFileSelected} 
+        accept=".pdf,image/*" 
+        className="hidden" 
+      />
+
       {/* Header & Add Button */}
       <div className="flex justify-between items-start mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Records</h1>
           <p className="text-gray-500 mt-1">View and download your clinical documents and test results.</p>
         </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); setIsModalOpen(true); }}
-          className="bg-teal-800 hover:bg-teal-900 text-white font-medium px-4 py-2.5 rounded-lg shadow transition duration-200 flex items-center gap-2 text-sm"
-        >
-          <span className="text-lg leading-none">+</span> Add Record
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Upload File Button directly opens mobile file picker */}
+          <button
+            onClick={(e) => { e.stopPropagation(); fileInputRef.current.click(); }}
+            className="bg-teal-700 hover:bg-teal-800 text-white font-medium px-4 py-2.5 rounded-lg shadow transition duration-200 flex items-center gap-2 text-sm"
+          >
+            <span>📎 Upload File / PDF</span>
+          </button>
+
+          <button
+            onClick={(e) => { e.stopPropagation(); setSelectedFile(null); setIsModalOpen(true); }}
+            className="bg-teal-800 hover:bg-teal-900 text-white font-medium px-4 py-2.5 rounded-lg shadow transition duration-200 flex items-center gap-2 text-sm"
+          >
+            <span className="text-lg leading-none">+</span> Add Record
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -308,19 +350,30 @@ export default function Records() {
         </button>
       )}
 
-      {/* Add Record Modal */}
+      {/* Add Record / Upload Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-900">Add New Record</h3>
+              <h3 className="text-xl font-bold text-gray-900">
+                {selectedFile ? 'Upload Selected File' : 'Add New Record'}
+              </h3>
               <button 
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => { setIsModalOpen(false); setSelectedFile(null); }}
                 className="text-gray-400 hover:text-gray-600 font-bold text-xl"
               >
                 &times;
               </button>
             </div>
+
+            {selectedFile && (
+              <div className="mb-4 bg-teal-50 border border-teal-200 text-teal-800 text-xs p-3 rounded-xl flex items-center justify-between">
+                <span>📎 <strong>Selected:</strong> {selectedFile.name}</span>
+                <span className="text-[10px] bg-teal-200 px-2 py-0.5 rounded-full uppercase font-bold">
+                  {selectedFile.type.includes('pdf') ? 'PDF' : 'Image/File'}
+                </span>
+              </div>
+            )}
 
             <form onSubmit={handleAddRecord} className="space-y-4">
               <div>
@@ -364,7 +417,7 @@ export default function Records() {
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => { setIsModalOpen(false); setSelectedFile(null); }}
                   className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2.5 rounded-xl font-medium transition"
                 >
                   Cancel
@@ -373,7 +426,7 @@ export default function Records() {
                   type="submit"
                   className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow"
                 >
-                  Save Record
+                  {selectedFile ? 'Upload & Save' : 'Save Record'}
                 </button>
               </div>
             </form>
