@@ -9,7 +9,8 @@ export default function Profile() {
     weight: '64',
     email: 'laxman.kundekar@healthmail.com',
     phone: '+91 98765 43210',
-    address: 'VIVA Institute of Technology, Virar, Mumbai'
+    address: 'VIVA Institute of Technology, Virar, Mumbai',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
   });
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -47,6 +48,15 @@ export default function Profile() {
     setIsEditModalOpen(false);
   };
 
+  // Handle Personal Photo Upload
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const imageUrl = URL.createObjectURL(file);
+      setProfile({ ...profile, avatar: imageUrl });
+    }
+  };
+
   return (
     <div className="p-6 max-w-4xl mx-auto pb-32">
       {/* Top Header */}
@@ -64,22 +74,37 @@ export default function Profile() {
         </button>
       </div>
 
-      {/* Banner & Avatar */}
+      {/* Banner & Avatar with Photo Upload */}
       <div className="relative mb-16">
         <div className="bg-teal-700 h-32 rounded-3xl relative overflow-hidden flex items-center justify-center">
           <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]"></div>
         </div>
+        
         <div className="absolute -bottom-10 left-1/2 transform -translate-x-1/2 flex flex-col items-center">
-          <div className="relative">
-            <img 
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80" 
-              alt="Profile" 
-              className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md"
+          <label className="relative group cursor-pointer">
+            <div className="w-24 h-24 rounded-full border-4 border-white shadow-md overflow-hidden bg-gray-200">
+              <img 
+                src={profile.avatar} 
+                alt="Profile Avatar" 
+                className="w-full h-full object-cover group-hover:opacity-90 transition"
+              />
+            </div>
+            
+            {/* Hover Camera Overlay */}
+            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white text-[11px] font-semibold text-center px-1">
+              📷 Change Photo
+            </div>
+
+            <input 
+              type="file" 
+              accept="image/*" 
+              onChange={handleImageUpload} 
+              className="hidden" 
             />
-            <span className="absolute bottom-0 right-0 bg-teal-700 text-white p-1 rounded-full text-xs shadow">
-              ✓
-            </span>
-          </div>
+          </label>
+          <span className="absolute bottom-0 right-0 bg-teal-700 text-white p-1 rounded-full text-xs shadow pointer-events-none">
+            ✓
+          </span>
         </div>
       </div>
 
