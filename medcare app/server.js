@@ -1,18 +1,14 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 
 const app = express();
+
+// Middleware MUST be declared before routes
 app.use(express.json());
 app.use(cors());
-
-// Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI)
-.then(() => console.log('MongoDB Connected Successfully'))
-.catch(err => console.log('Database connection error: ', err));
 
 // API Endpoints
 app.use('/api/auth', authRoutes);
@@ -22,6 +18,8 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
+
+// Start server instantly without waiting for cloud database connections
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`🚀 Server is listening and ready on port ${PORT}`);
 });

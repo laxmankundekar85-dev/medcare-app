@@ -33,21 +33,25 @@ export default function Login({ onLogin }) {
 
     try {
       if (isRegistering) {
-        // Call Backend Register API
-        await axios.post('http://localhost:5000/api/auth/register', {
+        // Call Backend Register API using relative path (leveraging proxy or same origin)
+        await axios.post('/api/auth/register', {
           fullName,
           email,
           password
+        }, {
+          headers: { 'Content-Type': 'application/json' }
         });
         
         alert('Registration successful! Please sign in.');
         setIsRegistering(false);
         setPassword('');
       } else {
-        // Call Backend Login API
-        const response = await axios.post('http://localhost:5000/api/auth/login', {
+        // Call Backend Login API using relative path
+        const response = await axios.post('/api/auth/login', {
           email,
           password
+        }, {
+          headers: { 'Content-Type': 'application/json' }
         });
 
         // Save token and user details to localStorage
