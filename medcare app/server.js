@@ -13,6 +13,12 @@ app.use(cors());
 // API Endpoints
 app.use('/api/auth', authRoutes);
 
+// Google OAuth Authentication Routes placeholder
+app.get('/api/auth/google', (req, res) => {
+  // TODO: Implement passport.js or official Google OAuth redirect logic here
+  res.status(501).json({ message: 'Google OAuth login endpoint not configured yet.' });
+});
+
 app.get('/', (req, res) => {
   res.send('Medcare Backend API is running...');
 });
