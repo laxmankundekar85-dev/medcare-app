@@ -270,7 +270,7 @@ export default function Login({ onLogin }) {
                       type="email" 
                       required
                       autoComplete="off"
-                      placeholder="laxman@example.com" 
+                      placeholder="alex@example.com" 
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600 text-sm" 
@@ -358,7 +358,7 @@ export default function Login({ onLogin }) {
                     type="text" 
                     required
                     autoComplete="off"
-                    placeholder="Laxman Babu" 
+                    placeholder="Enter Full Name" 
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600 text-sm" 

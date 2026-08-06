@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Menu, Bell, X, Home, Calendar, BriefcaseMedical, FileText, 
   User, Settings as SettingsIcon, Pill, Syringe, 
@@ -23,6 +23,27 @@ import PreviousDiseases from './pages/PreviousDiseases';
 export default function MedcareApp() {
   const [currentView, setCurrentView] = useState('login');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Dynamic User State from localStorage
+  const [user, setUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('user')) || { displayName: 'Patient' };
+    } catch {
+      return { displayName: 'Patient' };
+    }
+  });
+
+  // Update user state whenever currentView changes (e.g. after logging in)
+  useEffect(() => {
+    try {
+      const storedUser = JSON.parse(localStorage.getItem('user'));
+      if (storedUser) {
+        setUser(storedUser);
+      }
+    } catch (e) {
+      console.error('Error reading user data from localStorage', e);
+    }
+  }, [currentView]);
 
   // Notification States
   const [showNotifications, setShowNotifications] = useState(false);
@@ -52,6 +73,8 @@ export default function MedcareApp() {
     return <Login onLogin={() => navigateTo('dashboard')} />;
   }
 
+  const userDisplayName = user.displayName || 'Patient';
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20 relative">
       {/* Top Header */}
@@ -65,7 +88,7 @@ export default function MedcareApp() {
 
         {currentView === 'profile' || currentView === 'settings' ? (
            <div className="w-8 h-8 rounded-full bg-slate-300 overflow-hidden">
-             <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex" alt="Avatar" />
+             <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userDisplayName)}`} alt="Avatar" />
            </div>
         ) : (
           <div className="relative">
@@ -119,10 +142,10 @@ export default function MedcareApp() {
           >
             <div className="p-6 flex items-center gap-4 border-b border-slate-200">
                <div className="w-12 h-12 rounded-full bg-slate-300 overflow-hidden">
-                 <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" alt="User" />
+                 <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userDisplayName)}`} alt="User" />
                </div>
                <div>
-                 <h2 className="font-bold text-lg">Sarah Johnson</h2>
+                 <h2 className="font-bold text-lg">{userDisplayName}</h2>
                  <p className="text-sm text-slate-500">Patient ID: #MC8829</p>
                </div>
             </div>
