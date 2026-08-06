@@ -5,7 +5,8 @@ import {
   googleProvider, 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
-  signInWithPopup 
+  signInWithPopup,
+  sendPasswordResetEmail
 } from '../firebase';
 
 export default function Login({ onLogin }) {
@@ -15,10 +16,12 @@ export default function Login({ onLogin }) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
 
     // Form Validation
     if (!email || !password || (isRegistering && !fullName)) {
@@ -71,7 +74,11 @@ export default function Login({ onLogin }) {
       let errorMessage = 'An error occurred during authentication.';
       if (err.code === 'auth/email-already-in-use') {
         errorMessage = 'This email is already registered. Please sign in instead.';
-      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+      } else if (
+        err.code === 'auth/invalid-credential' || 
+        err.code === 'auth/user-not-found' || 
+        err.code === 'auth/wrong-password'
+      ) {
         errorMessage = 'Invalid email or password.';
       } else if (err.code === 'auth/weak-password') {
         errorMessage = 'Password should be at least 6 characters.';
@@ -82,8 +89,38 @@ export default function Login({ onLogin }) {
     }
   };
 
+  const handleForgotPassword = async () => {
+    setError('');
+    setSuccessMessage('');
+
+    if (!email) {
+      setError('Please enter your email address to reset your password.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setSuccessMessage(`Password reset link sent to ${email}. Check your inbox!`);
+    } catch (err) {
+      let errorMessage = 'Failed to send password reset email.';
+      if (err.code === 'auth/user-not-found') {
+        errorMessage = 'No user account found with this email address.';
+      } else if (err.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address format.';
+      }
+      setError(errorMessage);
+    }
+  };
+
   const handleGoogleLogin = async () => {
     setError('');
+    setSuccessMessage('');
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
@@ -119,6 +156,12 @@ export default function Login({ onLogin }) {
         {error && (
           <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-600 text-xs p-3 rounded-xl font-medium">
             {error}
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs p-3 rounded-xl font-medium">
+            {successMessage}
           </div>
         )}
 
@@ -158,7 +201,7 @@ export default function Login({ onLogin }) {
               {!isRegistering && (
                 <button 
                   type="button" 
-                  onClick={() => alert('Password reset instructions sent to your email.')}
+                  onClick={handleForgotPassword}
                   className="text-xs text-teal-700 font-semibold hover:underline"
                 >
                   Forgot Password?
@@ -215,7 +258,7 @@ export default function Login({ onLogin }) {
           <p>
             Already have an account?{' '}
             <button 
-              onClick={() => { setIsRegistering(false); setError(''); }} 
+              onClick={() => { setIsRegistering(false); setError(''); setSuccessMessage(''); }} 
               className="text-teal-700 font-medium hover:underline"
             >
               Sign In
@@ -225,7 +268,7 @@ export default function Login({ onLogin }) {
           <p>
             Don't have an account?{' '}
             <button 
-              onClick={() => { setIsRegistering(true); setError(''); }} 
+              onClick={() => { setIsRegistering(true); setError(''); setSuccessMessage(''); }} 
               className="text-teal-700 font-medium hover:underline"
             >
               Register
