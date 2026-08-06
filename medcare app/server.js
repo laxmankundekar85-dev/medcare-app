@@ -9,14 +9,30 @@ const app = express();
 
 // Middleware
 app.use(express.json());
-app.use(cors());
+app.use(cors({ origin: '*' }));
 
-// Initialize Firebase Admin SDK
-const serviceAccount = require('./serviceAccountKey.json');
+// Initialize Firebase Admin SDK (Supports both Environment Variables & Local File)
+let serviceAccount;
 
-initializeApp({
-  credential: cert(serviceAccount)
-});
+if (process.env.FIREBASE_PRIVATE_KEY) {
+  serviceAccount = {
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+  };
+} else {
+  try {
+    serviceAccount = require('./serviceAccountKey.json');
+  } catch (err) {
+    console.error('⚠️ Could not find serviceAccountKey.json. Make sure environment variables or key file exist.');
+  }
+}
+
+if (serviceAccount) {
+  initializeApp({
+    credential: cert(serviceAccount)
+  });
+}
 
 // Explicit Port 465 SSL Transporter Setup
 const transporter = nodemailer.createTransport({
@@ -135,6 +151,6 @@ app.post('/api/auth/verify-otp-reset', async (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server is listening and ready on port ${PORT}`);
 });
