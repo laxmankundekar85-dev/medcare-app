@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { BriefcaseMedical, Mail, Lock, Eye, EyeOff, LogOut } from 'lucide-react';
-
-const API_BASE_URL = window.location.hostname === 'localhost' 
-  ? 'http://localhost:5000' 
-  : 'https://medcare-app-qyao.onrender.com';
+import { 
+  auth, 
+  googleProvider, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signInWithPopup 
+} from '../firebase';
 
 export default function Login({ onLogin }) {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -37,41 +39,65 @@ export default function Login({ onLogin }) {
 
     try {
       if (isRegistering) {
-        // Call Backend Register API using dynamic API base URL
-        await axios.post(`${API_BASE_URL}/api/auth/register`, {
-          fullName,
-          email,
-          password
-        }, {
-          headers: { 'Content-Type': 'application/json' }
-        });
-        
-        alert('Registration successful! Please sign in.');
-        setIsRegistering(false);
-        setPassword('');
+        // Firebase Email & Password Registration
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+
+        // Store user state locally
+        localStorage.setItem('user', JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+          displayName: fullName
+        }));
+
+        alert('Registration successful! Signing you in...');
+        onLogin();
       } else {
-        // Call Backend Login API using dynamic API base URL
-        const response = await axios.post(`${API_BASE_URL}/api/auth/login`, {
-          email,
-          password
-        }, {
-          headers: { 'Content-Type': 'application/json' }
-        });
+        // Firebase Email & Password Login
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
 
-        // Save token and user details to localStorage
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        // Store user state locally
+        localStorage.setItem('user', JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName || 'User'
+        }));
 
-        // Trigger successful login transition in parent component
         onLogin();
       }
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || 'An error occurred during authentication.');
+      // Map Firebase error codes to user-friendly messages
+      let errorMessage = 'An error occurred during authentication.';
+      if (err.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email is already registered. Please sign in instead.';
+      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        errorMessage = 'Invalid email or password.';
+      } else if (err.code === 'auth/weak-password') {
+        errorMessage = 'Password should be at least 6 characters.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      setError(errorMessage);
     }
   };
 
-  const handleGoogleLogin = () => {
-    onLogin();
+  const handleGoogleLogin = async () => {
+    setError('');
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+
+      localStorage.setItem('user', JSON.stringify({
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName
+      }));
+
+      onLogin();
+    } catch (err) {
+      setError(err.message || 'Google sign-in failed.');
+    }
   };
 
   return (
