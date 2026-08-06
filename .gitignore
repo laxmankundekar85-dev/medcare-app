@@ -1,2 +1,22 @@
+# Dependencies
 node_modules/
-git add .
+/.pnp
+.pnp.js
+
+# Environment variables & secrets
+.env
+*.env
+serviceAccountKey.json
+medcare app/.env
+medcare app/serviceAccountKey.json
+
+# Build and production outputs
+dist/
+build/
+*.log
+
+# Editor & OS settings
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

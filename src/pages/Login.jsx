@@ -1,29 +1,50 @@
 import React, { useState } from 'react';
-import { BriefcaseMedical, Mail, Lock, Eye, EyeOff, LogOut } from 'lucide-react';
+import { BriefcaseMedical, Mail, Lock, Eye, EyeOff, LogOut, ArrowLeft, KeyRound } from 'lucide-react';
 import { 
   auth, 
   googleProvider, 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
-  signInWithPopup,
-  sendPasswordResetEmail
+  signInWithPopup 
 } from '../firebase';
 
 export default function Login({ onLogin }) {
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+
+  // Form Inputs
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+
+  // UI States
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Helper function to clear form inputs and messages
+  const clearFormState = () => {
+    setEmail('');
+    setPassword('');
+    setFullName('');
+    setOtp('');
+    setNewPassword('');
+    setError('');
+    setSuccessMessage('');
+  };
+
+  // ==========================================
+  // 1. HANDLE SIGN IN & REGISTER
+  // ==========================================
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccessMessage('');
 
-    // Form Validation
     if (!email || !password || (isRegistering && !fullName)) {
       setError('Please fill in all required fields.');
       return;
@@ -42,11 +63,9 @@ export default function Login({ onLogin }) {
 
     try {
       if (isRegistering) {
-        // Firebase Email & Password Registration
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        // Store user state locally
         localStorage.setItem('user', JSON.stringify({
           uid: user.uid,
           email: user.email,
@@ -56,11 +75,9 @@ export default function Login({ onLogin }) {
         alert('Registration successful! Signing you in...');
         onLogin();
       } else {
-        // Firebase Email & Password Login
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        // Store user state locally
         localStorage.setItem('user', JSON.stringify({
           uid: user.uid,
           email: user.email,
@@ -70,7 +87,6 @@ export default function Login({ onLogin }) {
         onLogin();
       }
     } catch (err) {
-      // Map Firebase error codes to user-friendly messages
       let errorMessage = 'An error occurred during authentication.';
       if (err.code === 'auth/email-already-in-use') {
         errorMessage = 'This email is already registered. Please sign in instead.';
@@ -89,12 +105,16 @@ export default function Login({ onLogin }) {
     }
   };
 
-  const handleForgotPassword = async () => {
+  // ==========================================
+  // 2. HANDLE REQUEST OTP (BACKEND API)
+  // ==========================================
+  const handleSendOTP = async (e) => {
+    e.preventDefault();
     setError('');
     setSuccessMessage('');
 
     if (!email) {
-      setError('Please enter your email address to reset your password.');
+      setError('Please enter your registered email address.');
       return;
     }
 
@@ -104,20 +124,77 @@ export default function Login({ onLogin }) {
       return;
     }
 
+    setLoading(true);
+
     try {
-      await sendPasswordResetEmail(auth, email);
-      setSuccessMessage(`Password reset link sent to ${email}. Check your inbox!`);
-    } catch (err) {
-      let errorMessage = 'Failed to send password reset email.';
-      if (err.code === 'auth/user-not-found') {
-        errorMessage = 'No user account found with this email address.';
-      } else if (err.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email address format.';
+      const response = await fetch('http://localhost:5000/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setOtpSent(true);
+        setSuccessMessage('A 6-digit verification code has been sent to your email.');
+      } else {
+        setError(data.error || 'Failed to send OTP.');
       }
-      setError(errorMessage);
+    } catch (err) {
+      setError('Server error. Please ensure your backend server is running on port 5000.');
+    } finally {
+      setLoading(false);
     }
   };
 
+  // ==========================================
+  // 3. HANDLE VERIFY OTP & RESET PASSWORD
+  // ==========================================
+  const handleVerifyAndReset = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMessage('');
+
+    if (!otp || !newPassword) {
+      setError('Please enter both the OTP code and your new password.');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setError('New password must be at least 6 characters long.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/verify-otp-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp, newPassword })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        alert('Password reset successful! You can now log in with your new password.');
+        setIsForgotPassword(false);
+        setOtpSent(false);
+        clearFormState();
+      } else {
+        setError(data.error || 'Invalid OTP code or password reset failed.');
+      }
+    } catch (err) {
+      setError('Server error. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==========================================
+  // 4. HANDLE GOOGLE LOGIN
+  // ==========================================
   const handleGoogleLogin = async () => {
     setError('');
     setSuccessMessage('');
@@ -147,10 +224,18 @@ export default function Login({ onLogin }) {
 
       <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-sm">
         <h2 className="text-2xl font-bold mb-2">
-          {isRegistering ? 'Create Account' : 'Welcome Back'}
+          {isForgotPassword 
+            ? 'Reset Password' 
+            : isRegistering 
+              ? 'Create Account' 
+              : 'Welcome Back'}
         </h2>
         <p className="text-slate-500 mb-6 text-sm">
-          {isRegistering ? 'Sign up to start tracking your health records.' : 'Please sign in to access your dashboard.'}
+          {isForgotPassword 
+            ? (otpSent ? 'Enter the 6-digit code and your new password.' : 'Enter your email to receive a verification OTP code.') 
+            : isRegistering 
+              ? 'Sign up to start tracking your health records.' 
+              : 'Please sign in to access your dashboard.'}
         </p>
 
         {error && (
@@ -165,115 +250,216 @@ export default function Login({ onLogin }) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {isRegistering && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Full Name</label>
-              <input 
-                type="text" 
-                required
-                placeholder="Laxman Babu" 
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600 text-sm" 
-              />
-            </div>
-          )}
-
+        {/* FORGOT PASSWORD / OTP VIEW */}
+        {isForgotPassword ? (
           <div>
-            <label className="block text-sm font-medium mb-1">Email Address</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-3.5 text-slate-400" size={20} />
-              <input 
-                type="email" 
-                required
-                placeholder="alex@example.com" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600 text-sm" 
-              />
-            </div>
-          </div>
+            {!otpSent ? (
+              /* Step 1: Input Email to Request OTP */
+              <form onSubmit={handleSendOTP} className="space-y-4" autoComplete="off">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email Address</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3.5 text-slate-400" size={20} />
+                    <input 
+                      type="email" 
+                      required
+                      autoComplete="off"
+                      placeholder="laxman@example.com" 
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600 text-sm" 
+                    />
+                  </div>
+                </div>
 
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="block text-sm font-medium">Password</label>
-              {!isRegistering && (
                 <button 
-                  type="button" 
-                  onClick={handleForgotPassword}
-                  className="text-xs text-teal-700 font-semibold hover:underline"
+                  type="submit" 
+                  disabled={loading}
+                  className="w-full bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl font-medium mt-2 flex justify-center items-center gap-2 transition shadow-sm disabled:opacity-50"
                 >
-                  Forgot Password?
+                  <span>{loading ? 'Sending OTP...' : 'Send Verification OTP'}</span>
                 </button>
-              )}
-            </div>
-            <div className="relative">
-              <Lock className="absolute left-3 top-3.5 text-slate-400" size={20} />
-              <input 
-                type={showPassword ? 'text' : 'password'} 
-                required
-                placeholder="••••••••" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600 text-sm" 
-              />
-              <button 
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600"
-              >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
-            </div>
+              </form>
+            ) : (
+              /* Step 2: Input 6-Digit OTP and New Password */
+              <form onSubmit={handleVerifyAndReset} className="space-y-4" autoComplete="off">
+                <div>
+                  <label className="block text-sm font-medium mb-1">6-Digit Verification Code</label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3 top-3.5 text-slate-400" size={20} />
+                    <input 
+                      type="text" 
+                      maxLength="6"
+                      required
+                      autoComplete="off"
+                      placeholder="123456" 
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600 text-sm tracking-widest font-mono text-center text-lg" 
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">New Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3.5 text-slate-400" size={20} />
+                    <input 
+                      type={showPassword ? 'text' : 'password'} 
+                      required
+                      autoComplete="new-password"
+                      placeholder="••••••••" 
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600 text-sm" 
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600"
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={loading}
+                  className="w-full bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl font-medium mt-2 flex justify-center items-center gap-2 transition shadow-sm disabled:opacity-50"
+                >
+                  <span>{loading ? 'Updating Password...' : 'Verify OTP & Set Password'}</span>
+                </button>
+              </form>
+            )}
+
+            <button 
+              type="button" 
+              onClick={() => { setIsForgotPassword(false); setOtpSent(false); clearFormState(); }}
+              className="mt-6 text-sm text-teal-700 font-medium hover:underline flex items-center justify-center gap-2 w-full"
+            >
+              <ArrowLeft size={16} /> Back to Sign In
+            </button>
           </div>
+        ) : (
+          /* STANDARD LOGIN / REGISTER VIEW */
+          <>
+            <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
+              {isRegistering && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Full Name</label>
+                  <input 
+                    type="text" 
+                    required
+                    autoComplete="off"
+                    placeholder="Laxman Babu" 
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600 text-sm" 
+                  />
+                </div>
+              )}
 
-          <button 
-            type="submit" 
-            className="w-full bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl font-medium mt-2 flex justify-center items-center gap-2 transition shadow-sm"
-          >
-            <span>{isRegistering ? 'Register Account' : 'Sign In'}</span> 
-            <LogOut size={18} className="rotate-180" />
-          </button>
-        </form>
+              <div>
+                <label className="block text-sm font-medium mb-1">Email Address</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3.5 text-slate-400" size={20} />
+                  <input 
+                    type="email" 
+                    required
+                    autoComplete="off"
+                    placeholder="alex@example.com" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600 text-sm" 
+                  />
+                </div>
+              </div>
 
-        <div className="flex items-center gap-4 my-6 text-slate-400 text-sm">
-          <div className="flex-1 h-px bg-slate-200"></div>
-          OR
-          <div className="flex-1 h-px bg-slate-200"></div>
-        </div>
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-sm font-medium">Password</label>
+                  {!isRegistering && (
+                    <button 
+                      type="button" 
+                      onClick={() => { setIsForgotPassword(true); clearFormState(); }}
+                      className="text-xs text-teal-700 font-semibold hover:underline"
+                    >
+                      Forgot Password?
+                    </button>
+                  )}
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3.5 text-slate-400" size={20} />
+                  <input 
+                    type={showPassword ? 'text' : 'password'} 
+                    required
+                    autoComplete="current-password"
+                    placeholder="••••••••" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600 text-sm" 
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
 
-        <button 
-          type="button"
-          onClick={handleGoogleLogin}
-          className="w-full bg-white border border-slate-200 hover:bg-slate-50 py-3 rounded-xl font-medium flex justify-center items-center gap-2 transition text-sm text-slate-700"
-        >
-          <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
-          Continue with Google
-        </button>
+              <button 
+                type="submit" 
+                className="w-full bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl font-medium mt-2 flex justify-center items-center gap-2 transition shadow-sm"
+              >
+                <span>{isRegistering ? 'Register Account' : 'Sign In'}</span> 
+                <LogOut size={18} className="rotate-180" />
+              </button>
+            </form>
+
+            <div className="flex items-center gap-4 my-6 text-slate-400 text-sm">
+              <div className="flex-1 h-px bg-slate-200"></div>
+              OR
+              <div className="flex-1 h-px bg-slate-200"></div>
+            </div>
+
+            <button 
+              type="button"
+              onClick={handleGoogleLogin}
+              className="w-full bg-white border border-slate-200 hover:bg-slate-50 py-3 rounded-xl font-medium flex justify-center items-center gap-2 transition text-sm text-slate-700"
+            >
+              <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
+              Continue with Google
+            </button>
+          </>
+        )}
       </div>
 
       <div className="mt-8 text-slate-500 text-sm">
-        {isRegistering ? (
-          <p>
-            Already have an account?{' '}
-            <button 
-              onClick={() => { setIsRegistering(false); setError(''); setSuccessMessage(''); }} 
-              className="text-teal-700 font-medium hover:underline"
-            >
-              Sign In
-            </button>
-          </p>
-        ) : (
-          <p>
-            Don't have an account?{' '}
-            <button 
-              onClick={() => { setIsRegistering(true); setError(''); setSuccessMessage(''); }} 
-              className="text-teal-700 font-medium hover:underline"
-            >
-              Register
-            </button>
-          </p>
+        {!isForgotPassword && (
+          isRegistering ? (
+            <p>
+              Already have an account?{' '}
+              <button 
+                onClick={() => { setIsRegistering(false); clearFormState(); }} 
+                className="text-teal-700 font-medium hover:underline"
+              >
+                Sign In
+              </button>
+            </p>
+          ) : (
+            <p>
+              Don't have an account?{' '}
+              <button 
+                onClick={() => { setIsRegistering(true); clearFormState(); }} 
+                className="text-teal-700 font-medium hover:underline"
+              >
+                Register
+              </button>
+            </p>
+          )
         )}
       </div>
     </div>
