@@ -8,8 +8,11 @@ import {
   signInWithPopup 
 } from '../firebase';
 
-// Dynamic API URL: Automatically adapts to your network IP (e.g., 192.168.1.34) or localhost
-const API_BASE_URL = `http://${window.location.hostname}:5000`;
+// Dynamic Base URL: Switches between Vercel deployment IP fallback and local network IP
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (window.location.hostname.includes('vercel.app') 
+    ? 'http://192.168.1.34:5000' // Your PC's Wi-Fi IP
+    : `http://${window.location.hostname}:5000`);
 
 export default function Login({ onLogin }) {
   const [isRegistering, setIsRegistering] = useState(false);
