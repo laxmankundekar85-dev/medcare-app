@@ -8,6 +8,9 @@ import {
   signInWithPopup 
 } from '../firebase';
 
+// Dynamic API URL: Automatically adapts to your network IP (e.g., 192.168.1.34) or localhost
+const API_BASE_URL = `http://${window.location.hostname}:5000`;
+
 export default function Login({ onLogin }) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -127,7 +130,7 @@ export default function Login({ onLogin }) {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/send-otp', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
@@ -142,7 +145,7 @@ export default function Login({ onLogin }) {
         setError(data.error || 'Failed to send OTP.');
       }
     } catch (err) {
-      setError('Server error. Please ensure your backend server is running on port 5000.');
+      setError(`Server error. Unable to connect to backend at ${API_BASE_URL}`);
     } finally {
       setLoading(false);
     }
@@ -169,7 +172,7 @@ export default function Login({ onLogin }) {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/verify-otp-reset', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/verify-otp-reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp, newPassword })
@@ -186,7 +189,7 @@ export default function Login({ onLogin }) {
         setError(data.error || 'Invalid OTP code or password reset failed.');
       }
     } catch (err) {
-      setError('Server error. Please try again later.');
+      setError('Server connection error. Please try again later.');
     } finally {
       setLoading(false);
     }
