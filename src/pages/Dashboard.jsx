@@ -142,10 +142,8 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 pb-24 relative font-sans" onClick={() => setIsFabMenuOpen(false)}>
-      <div 
-        className="flex justify-between items-start bg-white p-5 rounded-3xl border border-slate-100 shadow-sm cursor-pointer hover:border-teal-700 transition" 
-        onClick={() => { setTempName(patientName); setTempId(patientId); setIsProfileModalOpen(true); }}
-      >
+      {/* Top Banner Card (Removed onClick from container) */}
+      <div className="flex justify-between items-start bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <div>
           <h2 className="text-3xl font-bold text-slate-900">Good morning, {patientName}.</h2>
           <p className="text-slate-500 mt-0.5">
@@ -153,9 +151,20 @@ export default function Dashboard() {
             <span className="text-xs text-teal-700 font-semibold bg-teal-50 px-2 py-0.5 rounded-md ml-1">{patientId}</span>
           </p>
         </div>
-        <span className="text-xs bg-teal-50 hover:bg-teal-100 text-teal-800 font-semibold px-3 py-1.5 rounded-xl transition cursor-pointer">
+        
+        {/* onClick is now ONLY attached to this button */}
+        <button 
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setTempName(patientName); 
+            setTempId(patientId); 
+            setIsProfileModalOpen(true);
+          }}
+          className="text-xs bg-teal-50 hover:bg-teal-100 text-teal-800 font-semibold px-3 py-1.5 rounded-xl transition cursor-pointer"
+        >
           Edit Profile
-        </span>
+        </button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
