@@ -36,6 +36,9 @@ export default function Profile({ onLogout }) {
 
   const userId = "sample_firebase_user_id";
 
+  // ==========================================
+  // 1. FETCH PROFILE FROM BACKEND API
+  // ==========================================
   useEffect(() => {
     fetchProfile();
   }, [userId]);
@@ -52,7 +55,8 @@ export default function Profile({ onLogout }) {
           bloodGroup: data.bloodGroup || prev.bloodGroup,
           weight: data.weight ? String(data.weight) : prev.weight,
           email: data.email || prev.email,
-          phone: data.phone || prev.phone
+          phone: data.phone || prev.phone,
+          avatar: data.avatar || prev.avatar // Loads saved photo from MongoDB
         }));
       }
     } catch (error) {
@@ -67,6 +71,9 @@ export default function Profile({ onLogout }) {
     setIsEditModalOpen(true);
   };
 
+  // ==========================================
+  // 2. SAVE PROFILE FIELD CHANGES (PUT API)
+  // ==========================================
   const handleSaveProfile = async (e) => {
     e.preventDefault();
 
@@ -78,7 +85,8 @@ export default function Profile({ onLogout }) {
       bloodGroup: updatedProfile.bloodGroup,
       weight: Number(updatedProfile.weight) || 64,
       email: updatedProfile.email,
-      phone: updatedProfile.phone
+      phone: updatedProfile.phone,
+      avatar: updatedProfile.avatar
     };
 
     try {
@@ -97,12 +105,48 @@ export default function Profile({ onLogout }) {
     }
   };
 
+  // ==========================================
+  // 3. PERSIST PHOTO UPLOAD TO BACKEND (BASE64)
+  // ==========================================
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      const imageUrl = URL.createObjectURL(file);
-      setProfile({ ...profile, avatar: imageUrl });
-    }
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Image = reader.result;
+
+      // Update UI state immediately
+      setProfile(prev => ({ ...prev, avatar: base64Image }));
+
+      // Persist Base64 image to MongoDB backend
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fullName: profile.name,
+            patientId: profile.patientId,
+            bloodGroup: profile.bloodGroup,
+            weight: Number(profile.weight) || 64,
+            email: profile.email,
+            phone: profile.phone,
+            avatar: base64Image
+          })
+        });
+
+        if (response.ok) {
+          alert('✅ Profile photo updated and saved to server!');
+        } else {
+          alert('❌ Failed to save photo to server.');
+        }
+      } catch (error) {
+        console.error('Error saving profile photo:', error);
+        alert('❌ Error connecting to server while saving photo.');
+      }
+    };
+
+    reader.readAsDataURL(file);
   };
 
   return (
