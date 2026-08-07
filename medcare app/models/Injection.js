@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const medicationSchema = new mongoose.Schema({
+const injectionSchema = new mongoose.Schema({
   userId: { 
     type: String, 
     required: true 
@@ -13,14 +13,18 @@ const medicationSchema = new mongoose.Schema({
     type: String, 
     required: true 
   },
+  site: { 
+    type: String, 
+    default: 'Arm' 
+  },
   timing: { 
     type: String, 
     required: true 
   },
   status: { 
     type: String, 
-    default: 'Active' 
+    default: 'Pending' 
   }
 }, { timestamps: true });
 
-export default mongoose.model('Medication', medicationSchema);
+export default mongoose.model('Injection', injectionSchema);

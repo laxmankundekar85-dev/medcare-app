@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // Notice the new onLogout prop here
 export default function Profile({ onLogout }) {
@@ -36,6 +36,36 @@ export default function Profile({ onLogout }) {
     twoFactor: true
   });
 
+  // Dynamic Firebase Auth UID or user identifier
+  const userId = "sample_firebase_user_id";
+
+  // ==========================================
+  // 1. FETCH PROFILE FROM BACKEND API
+  // ==========================================
+  useEffect(() => {
+    fetchProfile();
+  }, [userId]);
+
+  const fetchProfile = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/profile/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setProfile(prev => ({
+          ...prev,
+          name: data.fullName || prev.name,
+          patientId: data.patientId || prev.patientId,
+          bloodGroup: data.bloodGroup || prev.bloodGroup,
+          weight: data.weight ? String(data.weight) : prev.weight,
+          email: data.email || prev.email,
+          phone: data.phone || prev.phone
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching profile data:', error);
+    }
+  };
+
   const openEditModal = (fieldKey, title) => {
     setEditField(fieldKey);
     setEditVal(profile[fieldKey]);
@@ -43,10 +73,38 @@ export default function Profile({ onLogout }) {
     setIsEditModalOpen(true);
   };
 
-  const handleSaveProfile = (e) => {
+  // ==========================================
+  // 2. SAVE PROFILE CHANGES (PUT API)
+  // ==========================================
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    setProfile({ ...profile, [editField]: editVal });
-    setIsEditModalOpen(false);
+
+    const updatedProfile = { ...profile, [editField]: editVal };
+
+    // Prepare API payload mapping
+    const payload = {
+      fullName: updatedProfile.name,
+      patientId: updatedProfile.patientId,
+      bloodGroup: updatedProfile.bloodGroup,
+      weight: Number(updatedProfile.weight) || 64,
+      email: updatedProfile.email,
+      phone: updatedProfile.phone
+    };
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/profile/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        setProfile(updatedProfile);
+        setIsEditModalOpen(false);
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+    }
   };
 
   // Handle Personal Photo Upload
@@ -59,16 +117,17 @@ export default function Profile({ onLogout }) {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto pb-32">
+    <div className="p-6 max-w-4xl mx-auto pb-32 font-sans">
       {/* Top Header */}
       <div className="flex justify-between items-center mb-6">
-        <button onClick={() => alert('Navigating back')} className="text-gray-700 font-bold text-lg">
+        <button type="button" onClick={() => alert('Navigating back')} className="text-gray-700 font-bold text-lg cursor-pointer">
           ←
         </button>
         <h1 className="text-xl font-bold text-gray-900">Profile</h1>
         <button 
+          type="button"
           onClick={() => openEditModal('name', 'Edit Name')}
-          className="text-gray-700 hover:text-teal-800 transition"
+          className="text-gray-700 hover:text-teal-800 transition cursor-pointer"
           title="Edit Profile"
         >
           ✏️
@@ -248,8 +307,9 @@ export default function Profile({ onLogout }) {
 
         {/* Updated Logout Button */}
         <button 
+          type="button"
           onClick={onLogout}
-          className="w-full bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 font-medium py-4 rounded-3xl transition flex items-center justify-center gap-2 text-sm shadow-sm"
+          className="w-full bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 font-medium py-4 rounded-3xl transition flex items-center justify-center gap-2 text-sm shadow-sm cursor-pointer"
         >
           <span>🚪</span> Logout Account
         </button>
@@ -262,8 +322,9 @@ export default function Profile({ onLogout }) {
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-gray-900">{modalTitle}</h3>
               <button 
+                type="button"
                 onClick={() => setIsEditModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-xl"
+                className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer"
               >
                 &times;
               </button>
@@ -277,7 +338,7 @@ export default function Profile({ onLogout }) {
                   required
                   value={editVal}
                   onChange={(e) => setEditVal(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700"
+                  className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700 text-sm"
                 />
               </div>
 
@@ -285,13 +346,13 @@ export default function Profile({ onLogout }) {
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
-                  className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2.5 rounded-xl font-medium transition"
+                  className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2.5 rounded-xl font-medium transition text-sm cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow"
+                  className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow text-sm cursor-pointer"
                 >
                   Save Changes
                 </button>
@@ -307,7 +368,7 @@ export default function Profile({ onLogout }) {
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-gray-900">Notification Settings</h3>
-              <button onClick={() => setActiveSubView(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
+              <button type="button" onClick={() => setActiveSubView(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer">&times;</button>
             </div>
             
             <div className="space-y-4 mb-6">
@@ -317,8 +378,9 @@ export default function Profile({ onLogout }) {
                   <p className="text-xs text-gray-500">Receive instant alerts for doses</p>
                 </div>
                 <button 
+                  type="button"
                   onClick={() => setNotifSettings({...notifSettings, push: !notifSettings.push})}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 transition ${notifSettings.push ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${notifSettings.push ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
                 >
                   <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
                 </button>
@@ -330,8 +392,9 @@ export default function Profile({ onLogout }) {
                   <p className="text-xs text-gray-500">Get text messages for appointments</p>
                 </div>
                 <button 
+                  type="button"
                   onClick={() => setNotifSettings({...notifSettings, sms: !notifSettings.sms})}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 transition ${notifSettings.sms ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${notifSettings.sms ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
                 >
                   <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
                 </button>
@@ -343,8 +406,9 @@ export default function Profile({ onLogout }) {
                   <p className="text-xs text-gray-500">Weekly health report updates</p>
                 </div>
                 <button 
+                  type="button"
                   onClick={() => setNotifSettings({...notifSettings, emailAlerts: !notifSettings.emailAlerts})}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 transition ${notifSettings.emailAlerts ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${notifSettings.emailAlerts ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
                 >
                   <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
                 </button>
@@ -352,8 +416,9 @@ export default function Profile({ onLogout }) {
             </div>
 
             <button
+              type="button"
               onClick={() => setActiveSubView(null)}
-              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow"
+              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow text-sm cursor-pointer"
             >
               Done
             </button>
@@ -366,7 +431,7 @@ export default function Profile({ onLogout }) {
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-gray-900">Privacy & Security</h3>
-              <button onClick={() => setActiveSubView(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
+              <button type="button" onClick={() => setActiveSubView(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer">&times;</button>
             </div>
             
             <div className="space-y-4 mb-6">
@@ -376,8 +441,9 @@ export default function Profile({ onLogout }) {
                   <p className="text-xs text-gray-500">Require fingerprint/face ID</p>
                 </div>
                 <button 
+                  type="button"
                   onClick={() => setPrivacySettings({...privacySettings, biometric: !privacySettings.biometric})}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 transition ${privacySettings.biometric ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${privacySettings.biometric ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
                 >
                   <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
                 </button>
@@ -389,8 +455,9 @@ export default function Profile({ onLogout }) {
                   <p className="text-xs text-gray-500">Extra layer of account security</p>
                 </div>
                 <button 
+                  type="button"
                   onClick={() => setPrivacySettings({...privacySettings, twoFactor: !privacySettings.twoFactor})}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 transition ${privacySettings.twoFactor ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${privacySettings.twoFactor ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
                 >
                   <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
                 </button>
@@ -398,8 +465,9 @@ export default function Profile({ onLogout }) {
             </div>
 
             <button
+              type="button"
               onClick={() => setActiveSubView(null)}
-              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow"
+              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow text-sm cursor-pointer"
             >
               Done
             </button>
@@ -412,14 +480,15 @@ export default function Profile({ onLogout }) {
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-gray-900">Medical Status Overview</h3>
-              <button onClick={() => setActiveSubView(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
+              <button type="button" onClick={() => setActiveSubView(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer">&times;</button>
             </div>
             <p className="text-gray-700 text-sm mb-6 leading-relaxed bg-teal-50 p-4 rounded-2xl border border-teal-100">
               Your immunization records and last clinical checkup with Dr. Alex River are fully verified and up to date.
             </p>
             <button
+              type="button"
               onClick={() => setActiveSubView(null)}
-              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition"
+              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition text-sm cursor-pointer"
             >
               Close
             </button>

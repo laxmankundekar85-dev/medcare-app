@@ -80,7 +80,7 @@ export default function MedcareApp() {
       {/* Top Header */}
       <header className="flex items-center justify-between p-4 bg-slate-50 sticky top-0 z-30 border-b border-slate-100">
         <div className="flex items-center gap-3">
-          <button onClick={() => setIsSidebarOpen(true)} className="p-1 text-teal-800">
+          <button onClick={() => setIsSidebarOpen(true)} className="p-1 text-teal-800 cursor-pointer">
             <Menu size={24} />
           </button>
           <h1 className="text-xl font-bold text-teal-800">Medcare</h1>
@@ -93,7 +93,7 @@ export default function MedcareApp() {
         ) : (
           <div className="relative">
             {/* Clickable Notification Button */}
-            <button onClick={handleOpenNotifications} className="relative p-1 text-teal-800 hover:bg-teal-50 rounded-full transition">
+            <button onClick={handleOpenNotifications} className="relative p-1 text-teal-800 hover:bg-teal-50 rounded-full transition cursor-pointer">
               <Bell size={24} />
               {hasUnread && (
                 <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-50"></span>
@@ -106,7 +106,7 @@ export default function MedcareApp() {
                 <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100">
                   <h3 className="font-bold text-sm text-slate-900">Notifications</h3>
                   {notifications.length > 0 && (
-                    <button onClick={handleClearNotifications} className="text-xs text-teal-700 font-semibold hover:underline">
+                    <button onClick={handleClearNotifications} className="text-xs text-teal-700 font-semibold hover:underline cursor-pointer">
                       Clear all
                     </button>
                   )}
@@ -168,7 +168,7 @@ export default function MedcareApp() {
             <div className="p-4">
               <button 
                 onClick={() => setIsSidebarOpen(false)}
-                className="w-full flex items-center justify-center gap-2 py-3 border border-teal-700 text-teal-700 rounded-xl hover:bg-teal-50"
+                className="w-full flex items-center justify-center gap-2 py-3 border border-teal-700 text-teal-700 rounded-xl hover:bg-teal-50 cursor-pointer"
               >
                 <X size={20} /> Close Menu
               </button>

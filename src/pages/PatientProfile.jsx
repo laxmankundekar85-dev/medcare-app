@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function PatientProfile() {
   const [patientName, setPatientName] = useState('Laxman Babu Kundekar');
@@ -8,12 +8,46 @@ export default function PatientProfile() {
   const [tempName, setTempName] = useState(patientName);
   const [tempId, setTempId] = useState(patientId);
 
-  const handleSave = (e) => {
+  // Dynamic Firebase Auth UID or user identifier
+  const userId = "sample_firebase_user_id";
+
+  // Fetch patient profile from MongoDB API on mount
+  useEffect(() => {
+    fetchProfile();
+  }, [userId]);
+
+  const fetchProfile = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/profile/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.fullName) setPatientName(data.fullName);
+        if (data.patientId) setPatientId(data.patientId);
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    }
+  };
+
+  const handleSave = async (e) => {
     e.preventDefault();
     if (!tempName || !tempId) return;
-    setPatientName(tempName);
-    setPatientId(tempId);
-    setIsEditing(false);
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/profile/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fullName: tempName, patientId: tempId })
+      });
+
+      if (response.ok) {
+        setPatientName(tempName);
+        setPatientId(tempId);
+        setIsEditing(false);
+      }
+    } catch (error) {
+      console.error('Error saving profile changes:', error);
+    }
   };
 
   return (
@@ -29,8 +63,9 @@ export default function PatientProfile() {
       </div>
 
       <button 
+        type="button"
         onClick={() => { setTempName(patientName); setTempId(patientId); setIsEditing(true); }}
-        className="text-xs bg-teal-50 hover:bg-teal-100 text-teal-800 font-semibold px-4 py-2 rounded-xl transition"
+        className="text-xs bg-teal-50 hover:bg-teal-100 text-teal-800 font-semibold px-4 py-2 rounded-xl transition cursor-pointer"
       >
         Edit Profile
       </button>
@@ -41,8 +76,9 @@ export default function PatientProfile() {
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-gray-900">Edit Patient Info</h3>
               <button 
+                type="button"
                 onClick={() => setIsEditing(false)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-xl"
+                className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer"
               >
                 &times;
               </button>
@@ -75,13 +111,13 @@ export default function PatientProfile() {
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2.5 rounded-xl font-medium transition text-sm"
+                  className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2.5 rounded-xl font-medium transition text-sm cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow text-sm"
+                  className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow text-sm cursor-pointer"
                 >
                   Save
                 </button>

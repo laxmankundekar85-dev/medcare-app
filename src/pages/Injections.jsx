@@ -1,17 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function Injections() {
-  const [injections, setInjections] = useState([
-    {
-      id: 1,
-      name: 'Influenza Vaccine',
-      date: 'Oct 24, 2023 • 09:30 AM',
-      status: 'Confirmed',
-      doctor: 'Dr. Sarah Chen',
-      location: 'VIVA Medical Center, Room 304',
-      notes: 'Annual seasonal flu shot. Please arrive 10 minutes prior.'
-    }
-  ]);
+  const [injections, setInjections] = useState([]);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [activeDetails, setActiveDetails] = useState(null);
@@ -24,31 +14,96 @@ export default function Injections() {
   const [location, setLocation] = useState('');
   const [newDateVal, setNewDateVal] = useState('');
 
-  const handleAddInjection = (e) => {
+  // Replace with dynamic Firebase Auth user UID or context variable
+  const userId = "sample_firebase_user_id";
+
+  // ==========================================
+  // 1. FETCH INJECTIONS FROM API
+  // ==========================================
+  useEffect(() => {
+    fetchInjections();
+  }, [userId]);
+
+  const fetchInjections = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/injections/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Map backend schema fields to frontend expectations
+        const formatted = data.map(item => ({
+          id: item._id,
+          name: item.name,
+          date: item.timing || 'Scheduled',
+          status: item.status || 'Confirmed',
+          doctor: item.doctor || 'Dr. Alex River',
+          location: item.location || 'VIVA Medical Center',
+          notes: item.notes || 'Scheduled immunization.'
+        }));
+
+        setInjections(formatted);
+      }
+    } catch (error) {
+      console.error('Error fetching injections:', error);
+    }
+  };
+
+  // ==========================================
+  // 2. ADD NEW INJECTION (POST API)
+  // ==========================================
+  const handleAddInjection = async (e) => {
     e.preventDefault();
     if (!injName || !injDate) return;
 
-    const newInj = {
-      id: Date.now(),
+    const payload = {
+      userId,
       name: injName,
-      date: injDate,
+      timing: injDate,
+      dosage: 'Standard Dosage',
       status: 'Confirmed',
       doctor: doctor || 'Dr. Alex River',
       location: location || 'VIVA Medical Center',
       notes: 'Scheduled immunization.'
     };
 
-    setInjections([newInj, ...injections]);
-    setIsAddModalOpen(false);
-    setInjName('');
-    setInjDate('');
-    setDoctor('');
-    setLocation('');
+    try {
+      const response = await fetch('http://localhost:5000/api/injections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const savedInj = await response.json();
+
+        const newInj = {
+          id: savedInj._id,
+          name: savedInj.name,
+          date: savedInj.timing,
+          status: savedInj.status || 'Confirmed',
+          doctor: savedInj.doctor || payload.doctor,
+          location: savedInj.location || payload.location,
+          notes: savedInj.notes || payload.notes
+        };
+
+        setInjections([newInj, ...injections]);
+        setIsAddModalOpen(false);
+        setInjName('');
+        setInjDate('');
+        setDoctor('');
+        setLocation('');
+      }
+    } catch (error) {
+      console.error('Error adding injection:', error);
+    }
   };
 
+  // ==========================================
+  // 3. RESCHEDULE INJECTION
+  // ==========================================
   const handleSaveReschedule = (e) => {
     e.preventDefault();
-    if (!newDateVal) return;
+    if (!newDateVal || !activeReschedule) return;
 
     setInjections(injections.map(inj => {
       if (inj.id === activeReschedule.id) {
@@ -61,17 +116,30 @@ export default function Injections() {
     setNewDateVal('');
   };
 
-  const handleDelete = (id, e) => {
+  // ==========================================
+  // 4. DELETE INJECTION (DELETE API)
+  // ==========================================
+  const handleDelete = async (id, e) => {
     e.stopPropagation();
-    if (window.confirm('Are you sure you want to remove this vaccination record?')) {
-      setInjections(injections.filter(inj => inj.id !== id));
-      if (activeDetails && activeDetails.id === id) setActiveDetails(null);
-      if (activeReschedule && activeReschedule.id === id) setActiveReschedule(null);
+    if (!window.confirm('Are you sure you want to remove this vaccination record?')) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/injections/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        setInjections(injections.filter(inj => inj.id !== id));
+        if (activeDetails && activeDetails.id === id) setActiveDetails(null);
+        if (activeReschedule && activeReschedule.id === id) setActiveReschedule(null);
+      }
+    } catch (error) {
+      console.error('Error deleting injection:', error);
     }
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-28">
+    <div className="space-y-6 max-w-4xl mx-auto pb-28 font-sans">
       {/* Top Header & Add Action */}
       <div className="flex justify-between items-center">
         <div>
@@ -80,7 +148,7 @@ export default function Injections() {
         </div>
         <button 
           onClick={() => setIsAddModalOpen(true)}
-          className="bg-teal-800 hover:bg-teal-900 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-sm transition flex items-center gap-2"
+          className="bg-teal-800 hover:bg-teal-900 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-sm transition flex items-center gap-2 cursor-pointer"
         >
           <span>+</span> Add Injection
         </button>
@@ -100,7 +168,7 @@ export default function Injections() {
             >
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-teal-50 text-teal-700 rounded-2xl flex items-center justify-center font-bold text-lg">
+                  <div className="w-12 h-12 bg-teal-50 text-teal-700 rounded-2xl flex items-center justify-center font-bold text-lg shrink-0">
                     💉
                   </div>
                   <div>
@@ -115,7 +183,7 @@ export default function Injections() {
                   </span>
                   <button 
                     onClick={(e) => handleDelete(inj.id, e)}
-                    className="text-slate-300 hover:text-rose-500 p-2 font-bold transition"
+                    className="text-slate-300 hover:text-rose-500 p-2 font-bold transition cursor-pointer"
                     title="Delete record"
                   >
                     ✕
@@ -127,13 +195,13 @@ export default function Injections() {
               <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
                 <button 
                   onClick={() => setActiveDetails(inj)}
-                  className="bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-2xl font-medium text-sm transition shadow-xs"
+                  className="bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-2xl font-medium text-sm transition shadow-xs cursor-pointer"
                 >
                   Details
                 </button>
                 <button 
                   onClick={() => setActiveReschedule(inj)}
-                  className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2.5 rounded-2xl font-medium text-sm transition"
+                  className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2.5 rounded-2xl font-medium text-sm transition cursor-pointer"
                 >
                   Reschedule
                 </button>
@@ -149,7 +217,13 @@ export default function Injections() {
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-slate-900">Add New Injection</h3>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold text-xl">&times;</button>
+              <button 
+                type="button"
+                onClick={() => setIsAddModalOpen(false)} 
+                className="text-slate-400 hover:text-slate-600 font-bold text-xl cursor-pointer"
+              >
+                &times;
+              </button>
             </div>
 
             <form onSubmit={handleAddInjection} className="space-y-4">
@@ -200,8 +274,19 @@ export default function Injections() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setIsAddModalOpen(false)} className="flex-1 border border-slate-300 py-2.5 rounded-xl text-slate-600 font-medium text-sm">Cancel</button>
-                <button type="submit" className="flex-1 bg-teal-800 text-white py-2.5 rounded-xl font-medium text-sm shadow">Save Injection</button>
+                <button 
+                  type="button" 
+                  onClick={() => setIsAddModalOpen(false)} 
+                  className="flex-1 border border-slate-300 py-2.5 rounded-xl text-slate-600 font-medium text-sm cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium text-sm shadow transition cursor-pointer"
+                >
+                  Save Injection
+                </button>
               </div>
             </form>
           </div>
@@ -214,7 +299,13 @@ export default function Injections() {
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-slate-900">{activeDetails.name}</h3>
-              <button onClick={() => setActiveDetails(null)} className="text-slate-400 hover:text-slate-600 font-bold text-xl">&times;</button>
+              <button 
+                type="button"
+                onClick={() => setActiveDetails(null)} 
+                className="text-slate-400 hover:text-slate-600 font-bold text-xl cursor-pointer"
+              >
+                &times;
+              </button>
             </div>
 
             <div className="space-y-4 mb-6">
@@ -232,7 +323,11 @@ export default function Injections() {
               </div>
             </div>
 
-            <button onClick={() => setActiveDetails(null)} className="w-full bg-teal-800 text-white py-2.5 rounded-xl font-medium transition shadow text-sm">
+            <button 
+              type="button"
+              onClick={() => setActiveDetails(null)} 
+              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow text-sm cursor-pointer"
+            >
               Close
             </button>
           </div>
@@ -245,7 +340,13 @@ export default function Injections() {
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-slate-900">Reschedule Injection</h3>
-              <button onClick={() => setActiveReschedule(null)} className="text-slate-400 hover:text-slate-600 font-bold text-xl">&times;</button>
+              <button 
+                type="button"
+                onClick={() => setActiveReschedule(null)} 
+                className="text-slate-400 hover:text-slate-600 font-bold text-xl cursor-pointer"
+              >
+                &times;
+              </button>
             </div>
 
             <form onSubmit={handleSaveReschedule} className="space-y-4">
@@ -272,8 +373,19 @@ export default function Injections() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setActiveReschedule(null)} className="flex-1 border border-slate-300 py-2.5 rounded-xl text-slate-600 font-medium text-sm">Cancel</button>
-                <button type="submit" className="flex-1 bg-teal-800 text-white py-2.5 rounded-xl font-medium text-sm shadow">Confirm New Date</button>
+                <button 
+                  type="button" 
+                  onClick={() => setActiveReschedule(null)} 
+                  className="flex-1 border border-slate-300 py-2.5 rounded-xl text-slate-600 font-medium text-sm cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium text-sm shadow transition cursor-pointer"
+                >
+                  Confirm New Date
+                </button>
               </div>
             </form>
           </div>

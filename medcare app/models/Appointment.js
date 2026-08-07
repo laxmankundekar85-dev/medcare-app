@@ -1,26 +1,30 @@
 import mongoose from 'mongoose';
 
-const medicationSchema = new mongoose.Schema({
+const appointmentSchema = new mongoose.Schema({
   userId: { 
     type: String, 
     required: true 
   },
-  name: { 
+  doctorName: { 
     type: String, 
     required: true 
   },
-  dosage: { 
+  specialty: { 
+    type: String 
+  },
+  date: { 
     type: String, 
     required: true 
   },
-  timing: { 
+  time: { 
     type: String, 
     required: true 
   },
   status: { 
     type: String, 
-    default: 'Active' 
+    enum: ['Confirmed', 'Pending', 'Cancelled'], 
+    default: 'Confirmed' 
   }
 }, { timestamps: true });
 
-export default mongoose.model('Medication', medicationSchema);
+export default mongoose.model('Appointment', appointmentSchema);

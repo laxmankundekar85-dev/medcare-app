@@ -1,98 +1,170 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function Medications() {
-  const [medications, setMedications] = useState([
-    { 
-      id: 1, 
-      name: 'Metformin', 
-      dosage: '500mg • Twice daily', 
-      nextTiming: 'Next: 8:00 PM',
-      takenTiming: null,
-      isTaken: false,
-      status: 'Active',
-      statusColor: 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-    },
-    { 
-      id: 2, 
-      name: 'Lisinopril', 
-      dosage: '10.0mg • Once daily', 
-      nextTiming: null,
-      takenTiming: 'Taken: 09:15 AM ✓',
-      isTaken: true,
-      status: 'Active',
-      statusColor: 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-    },
-    { 
-      id: 3, 
-      name: 'Atorvastatin', 
-      dosage: '20mg • At bedtime', 
-      nextTiming: 'Next: 10:30 PM',
-      takenTiming: null,
-      isTaken: false,
-      status: 'Upcoming',
-      statusColor: 'bg-slate-100 text-slate-600 border border-slate-200'
-    }
-  ]);
-
+  const [medications, setMedications] = useState([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [medName, setMedName] = useState('');
   const [dosage, setDosage] = useState('');
   const [timing, setTiming] = useState('');
 
-  // Toggle dose taken/pending status reliably
-  const toggleTakenStatus = (id, e) => {
-    e.stopPropagation(); // Stops event bubbling
-    setMedications(prevMeds =>
-      prevMeds.map(med => {
-        if (med.id === id) {
-          const nextIsTaken = !med.isTaken;
-          const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          return {
-            ...med,
-            isTaken: nextIsTaken,
-            takenTiming: nextIsTaken ? `Taken: ${currentTime} ✓` : null,
-            nextTiming: !nextIsTaken ? (med.nextTiming || 'Next: Scheduled daily') : null
-          };
-        }
-        return med;
-      })
-    );
-  };
+  // Replace this with your dynamic Firebase Auth user UID or auth context
+  const userId = "sample_firebase_user_id"; 
 
-  // Handle removing a medication
-  const handleDeleteMedication = (id, e) => {
-    e.stopPropagation();
-    if (window.confirm('Are you sure you want to remove this medication from your schedule?')) {
-      setMedications(prevMeds => prevMeds.filter(med => med.id !== id));
+  // ==========================================
+  // 1. FETCH MEDICATIONS FROM MONGO DB
+  // ==========================================
+  useEffect(() => {
+    fetchMedications();
+  }, [userId]);
+
+  const fetchMedications = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/medications/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        // Transform MongoDB documents to UI-compatible objects
+        const formattedData = data.map(item => {
+          const isTaken = item.status === 'Taken' || item.status === 'Completed';
+          
+          return {
+            id: item._id,
+            name: item.name,
+            dosage: item.dosage,
+            rawTiming: item.timing,
+            nextTiming: item.timing ? `Next: ${item.timing}` : 'Next: Scheduled daily',
+            takenTiming: isTaken ? `Taken: ${new Date(item.updatedAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ✓` : null,
+            isTaken: isTaken,
+            status: isTaken ? 'Taken' : 'Active',
+            statusColor: isTaken 
+              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+              : 'bg-slate-100 text-slate-600 border border-slate-200'
+          };
+        });
+        setMedications(formattedData);
+      }
+    } catch (error) {
+      console.error('Error fetching medications:', error);
     }
   };
 
-  // Handle adding a new medication
-  const handleAddMedication = (e) => {
+  // ==========================================
+  // 2. TOGGLE TAKEN STATUS (PATCH API)
+  // ==========================================
+  const toggleTakenStatus = async (id, e) => {
+    e.stopPropagation();
+
+    const targetMed = medications.find(m => m.id === id);
+    if (!targetMed) return;
+
+    const nextIsTaken = !targetMed.isTaken;
+    const nextStatus = nextIsTaken ? 'Taken' : 'Active';
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/medications/${id}/toggle`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus })
+      });
+
+      if (response.ok) {
+        const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        setMedications(prevMeds =>
+          prevMeds.map(med => {
+            if (med.id === id) {
+              return {
+                ...med,
+                isTaken: nextIsTaken,
+                status: nextStatus,
+                statusColor: nextIsTaken 
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                  : 'bg-slate-100 text-slate-600 border border-slate-200',
+                takenTiming: nextIsTaken ? `Taken: ${currentTime} ✓` : null,
+                nextTiming: !nextIsTaken ? (med.rawTiming ? `Next: ${med.rawTiming}` : 'Next: Scheduled daily') : null
+              };
+            }
+            return med;
+          })
+        );
+      } else {
+        alert("Failed to update medication status on server.");
+      }
+    } catch (error) {
+      console.error('Error toggling medication status:', error);
+    }
+  };
+
+  // ==========================================
+  // 3. DELETE MEDICATION (DELETE API)
+  // ==========================================
+  const handleDeleteMedication = async (id, e) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to remove this medication from your schedule?')) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/medications/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        setMedications(prevMeds => prevMeds.filter(med => med.id !== id));
+      }
+    } catch (error) {
+      console.error('Error deleting medication:', error);
+    }
+  };
+
+  // ==========================================
+  // 4. ADD NEW MEDICATION (POST API)
+  // ==========================================
+  const handleAddMedication = async (e) => {
     e.preventDefault();
     if (!medName || !dosage) return;
 
-    const newMed = {
-      id: Date.now(),
+    const payload = {
+      userId,
       name: medName,
       dosage: dosage,
-      nextTiming: timing ? `Next: ${timing}` : 'Next: Scheduled daily',
-      takenTiming: null,
-      isTaken: false,
-      status: 'Active',
-      statusColor: 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+      timing: timing || 'Scheduled daily',
+      status: 'Active'
     };
 
-    setMedications(prevMeds => [...prevMeds, newMed]);
-    setIsAddModalOpen(false);
-    
-    // Reset form inputs
-    setMedName('');
-    setDosage('');
-    setTiming('');
+    try {
+      const response = await fetch('http://localhost:5000/api/medications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const savedItem = await response.json();
+        
+        const newMed = {
+          id: savedItem._id,
+          name: savedItem.name,
+          dosage: savedItem.dosage,
+          rawTiming: savedItem.timing,
+          nextTiming: timing ? `Next: ${timing}` : 'Next: Scheduled daily',
+          takenTiming: null,
+          isTaken: false,
+          status: 'Active',
+          statusColor: 'bg-slate-100 text-slate-600 border border-slate-200'
+        };
+
+        setMedications(prevMeds => [...prevMeds, newMed]);
+        setIsAddModalOpen(false);
+
+        // Reset form inputs
+        setMedName('');
+        setDosage('');
+        setTiming('');
+      }
+    } catch (error) {
+      console.error('Error adding medication:', error);
+    }
   };
 
-  // Calculate dynamic completion percentage based on taken medications
+  // Calculate dynamic completion percentage
   const completedCount = medications.filter(m => m.isTaken).length;
   const completionPercentage = medications.length > 0 ? Math.round((completedCount / medications.length) * 100) : 0;
 
@@ -139,7 +211,7 @@ export default function Medications() {
               </div>
 
               <div className="flex items-center gap-3 self-end sm:self-auto">
-                {/* Fully Working Taken / Pending Button */}
+                {/* Taken / Pending Toggle Button */}
                 <button
                   type="button"
                   onClick={(e) => toggleTakenStatus(med.id, e)}

@@ -1,27 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function Appointments() {
   const [selectedDate, setSelectedDate] = useState('Mon 12');
 
-  const [upcoming, setUpcoming] = useState([
-    {
-      id: 1,
-      doctor: 'Dr. Alexander River',
-      specialty: 'General Practitioner',
-      date: 'Aug 12, 2024',
-      time: '09:30 AM',
-      status: 'Confirmed'
-    },
-    {
-      id: 2,
-      doctor: 'Dr. Sarah Chen',
-      specialty: 'Cardiologist',
-      date: 'Aug 15, 2024',
-      time: '02:00 PM',
-      status: 'Confirmed'
-    }
-  ]);
-
+  const [upcoming, setUpcoming] = useState([]);
   const [history, setHistory] = useState([
     {
       id: 101,
@@ -57,45 +39,116 @@ export default function Appointments() {
 
   const [activeSummary, setActiveSummary] = useState(null);
 
-  // 1. Cancel Appointment
-  const handleCancel = (id) => {
-    setUpcoming(upcoming.filter(app => app.id !== id));
-    alert('Appointment successfully cancelled.');
+  // Dynamic user context ID (replace with actual Firebase Auth UID if needed)
+  const userId = "sample_firebase_user_id";
+
+  // ==========================================
+  // 1. FETCH APPOINTMENTS FROM BACKEND API
+  // ==========================================
+  useEffect(() => {
+    fetchAppointments();
+  }, [userId]);
+
+  const fetchAppointments = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/appointments/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        const formatted = data.map(item => ({
+          id: item._id,
+          doctor: item.doctorName,
+          specialty: item.specialty || 'General Practitioner',
+          date: item.date,
+          time: item.time,
+          status: item.status || 'Confirmed'
+        }));
+        setUpcoming(formatted);
+      }
+    } catch (error) {
+      console.error('Error fetching appointments:', error);
+    }
   };
 
-  // 2. Reschedule Appointment
+  // ==========================================
+  // 2. CANCEL APPOINTMENT (DELETE API)
+  // ==========================================
+  const handleCancel = async (id) => {
+    if (!window.confirm('Are you sure you want to cancel this appointment?')) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/appointments/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        setUpcoming(prev => prev.filter(app => app.id !== id));
+        alert('Appointment successfully cancelled.');
+      }
+    } catch (error) {
+      console.error('Error cancelling appointment:', error);
+    }
+  };
+
+  // ==========================================
+  // 3. RESCHEDULE APPOINTMENT
+  // ==========================================
   const handleReschedule = (id) => {
     const newDate = prompt('Enter new date (e.g., Aug 20, 2024):');
     const newTime = prompt('Enter new time (e.g., 11:00 AM):');
     if (newDate && newTime) {
-      setUpcoming(upcoming.map(app => app.id === id ? { ...app, date: newDate, time: newTime } : app));
+      setUpcoming(prev => prev.map(app => app.id === id ? { ...app, date: newDate, time: newTime } : app));
       alert('Appointment rescheduled successfully!');
     }
   };
 
-  // 3. Add New Appointment
-  const handleAddAppointment = (e) => {
+  // ==========================================
+  // 4. ADD NEW APPOINTMENT (POST API)
+  // ==========================================
+  const handleAddAppointment = async (e) => {
     e.preventDefault();
     if (!docName || !appDate) return;
 
-    const newApp = {
-      id: Date.now(),
-      doctor: docName,
+    const payload = {
+      userId,
+      doctorName: docName,
       specialty: specialty || 'Specialist',
       date: appDate,
       time: appTime || '10:00 AM',
       status: 'Confirmed'
     };
 
-    setUpcoming([newApp, ...upcoming]);
-    setDocName('');
-    setSpecialty('');
-    setAppDate('');
-    setAppTime('');
-    setIsModalOpen(false);
+    try {
+      const response = await fetch('http://localhost:5000/api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const savedAppt = await response.json();
+        
+        const newApp = {
+          id: savedAppt._id,
+          doctor: savedAppt.doctorName,
+          specialty: savedAppt.specialty,
+          date: savedAppt.date,
+          time: savedAppt.time,
+          status: savedAppt.status
+        };
+
+        setUpcoming(prev => [newApp, ...prev]);
+        setDocName('');
+        setSpecialty('');
+        setAppDate('');
+        setAppTime('');
+        setIsModalOpen(false);
+      }
+    } catch (error) {
+      console.error('Error saving appointment:', error);
+    }
   };
 
-  // Dates for the horizontal picker
+  // Dates for horizontal picker
   const datePickerList = [
     { day: 'Mon', date: '12' },
     { day: 'Tue', date: '13' },
@@ -159,7 +212,7 @@ export default function Appointments() {
                   </div>
                 </div>
                 <span className="bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                  ✓ Confirmed
+                  ✓ {app.status}
                 </span>
               </div>
 
@@ -176,13 +229,13 @@ export default function Appointments() {
               <div className="flex gap-3">
                 <button
                   onClick={() => handleCancel(app.id)}
-                  className="flex-1 border border-gray-200 hover:bg-gray-50 text-gray-700 py-2.5 rounded-2xl font-medium transition text-sm"
+                  className="flex-1 border border-gray-200 hover:bg-gray-50 text-gray-700 py-2.5 rounded-2xl font-medium transition text-sm cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => handleReschedule(app.id)}
-                  className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-2xl font-medium transition text-sm shadow-sm"
+                  className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-2xl font-medium transition text-sm shadow-sm cursor-pointer"
                 >
                   Reschedule
                 </button>
@@ -212,7 +265,7 @@ export default function Appointments() {
             <div className="pt-3 border-t border-gray-100 flex justify-between items-center mt-3">
               <button
                 onClick={() => setActiveSummary(hist)}
-                className="text-xs font-bold text-teal-800 hover:underline flex items-center gap-1"
+                className="text-xs font-bold text-teal-800 hover:underline flex items-center gap-1 cursor-pointer"
               >
                 View Summary →
               </button>
@@ -224,7 +277,7 @@ export default function Appointments() {
       {/* Floating Add Action Button */}
       <button
         onClick={() => setIsModalOpen(true)}
-        className="fixed bottom-24 right-6 bg-teal-800 hover:bg-teal-900 text-white w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-3xl transition duration-200 z-30"
+        className="fixed bottom-24 right-6 bg-teal-800 hover:bg-teal-900 text-white w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-3xl transition duration-200 z-30 cursor-pointer"
         title="Schedule Appointment"
       >
         +
@@ -238,7 +291,7 @@ export default function Appointments() {
               <h3 className="text-xl font-bold text-gray-900">Schedule Appointment</h3>
               <button 
                 onClick={() => setIsModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-xl"
+                className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer"
               >
                 &times;
               </button>
@@ -253,7 +306,7 @@ export default function Appointments() {
                   placeholder="e.g., Dr. Robert Smith"
                   value={docName}
                   onChange={(e) => setDocName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700"
+                  className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700 text-sm"
                 />
               </div>
 
@@ -264,7 +317,7 @@ export default function Appointments() {
                   placeholder="e.g., Dermatologist"
                   value={specialty}
                   onChange={(e) => setSpecialty(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700"
+                  className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700 text-sm"
                 />
               </div>
 
@@ -276,7 +329,7 @@ export default function Appointments() {
                   placeholder="e.g., Aug 20, 2024"
                   value={appDate}
                   onChange={(e) => setAppDate(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700"
+                  className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700 text-sm"
                 />
               </div>
 
@@ -288,7 +341,7 @@ export default function Appointments() {
                   placeholder="e.g., 10:30 AM"
                   value={appTime}
                   onChange={(e) => setAppTime(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700"
+                  className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700 text-sm"
                 />
               </div>
 
@@ -296,13 +349,13 @@ export default function Appointments() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2.5 rounded-xl font-medium transition"
+                  className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2.5 rounded-xl font-medium transition text-sm cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow"
+                  className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow text-sm cursor-pointer"
                 >
                   Book Appointment
                 </button>
@@ -320,7 +373,7 @@ export default function Appointments() {
               <h3 className="text-xl font-bold text-gray-900">{activeSummary.title}</h3>
               <button 
                 onClick={() => setActiveSummary(null)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-xl"
+                className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer"
               >
                 &times;
               </button>
@@ -331,7 +384,7 @@ export default function Appointments() {
             </div>
             <button
               onClick={() => setActiveSummary(null)}
-              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition"
+              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition text-sm cursor-pointer"
             >
               Close
             </button>

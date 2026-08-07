@@ -1,80 +1,143 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function PreviousDiseases() {
-  const [diseases, setDiseases] = useState([
-    { 
-      id: 1, 
-      name: 'Seasonal Allergic Rhinitis', 
-      category: 'RESPIRATORY',
-      diagnosed: 'March 2024', 
-      status: 'Managed', 
-      doctor: 'Dr. Alex River',
-      notes: 'Mild seasonal symptoms triggered by pollen. Prescribed antihistamines as needed.'
-    },
-    { 
-      id: 2, 
-      name: 'Mild Hypertension', 
-      category: 'CARDIOVASCULAR',
-      diagnosed: 'January 2023', 
-      status: 'Monitored', 
-      doctor: 'Dr. Sarah Chen',
-      notes: 'Blood pressure checked weekly. Routine dietary sodium reduction advised.'
-    }
-  ]);
-
+  const [diseases, setDiseases] = useState([]);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeDetails, setActiveDetails] = useState(null);
 
   // Form state for adding new condition
   const [conditionName, setConditionName] = useState('');
-  const [category, setCategory] = useState('GENERAL');
+  const [category, setCategory] = useState('RESPIRATORY');
   const [diagDate, setDiagDate] = useState('');
   const [doctorName, setDoctorName] = useState('');
   const [notes, setNotes] = useState('');
 
-  const handleAddCondition = (e) => {
-    e.preventDefault();
-    if (!conditionName || !diagDate) return;
+  // Dynamic Firebase Auth UID or user identifier
+  const userId = "sample_firebase_user_id";
 
-    const newDisease = {
-      id: Date.now(),
-      name: conditionName,
-      category: category,
-      diagnosed: diagDate,
-      status: 'Active',
-      doctor: doctorName || 'Attending Physician',
-      notes: notes || 'No additional notes provided.'
-    };
+  // ==========================================
+  // 1. FETCH CONDITIONS FROM BACKEND API
+  // ==========================================
+  useEffect(() => {
+    fetchDiseases();
+  }, [userId]);
 
-    setDiseases([newDisease, ...diseases]);
-    setIsModalOpen(false);
-    
-    // Reset form fields
-    setConditionName('');
-    setCategory('GENERAL');
-    setDiagDate('');
-    setDoctorName('');
-    setNotes('');
+  const fetchDiseases = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/previous-diseases/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+
+        // Format data keys safely for frontend rendering
+        const formatted = data.map(item => ({
+          id: item._id,
+          name: item.diseaseName || 'Unnamed Condition',
+          category: item.category || 'GENERAL',
+          diagnosed: item.diagnosedDate || 'N/A',
+          status: item.status || 'Ongoing',
+          doctor: item.treatingDoctor || 'Attending Physician',
+          notes: item.notes || 'No additional notes provided.'
+        }));
+
+        setDiseases(formatted);
+      }
+    } catch (error) {
+      console.error('Error fetching medical history:', error);
+    }
   };
 
-  const handleDelete = (id, e) => {
-    e.stopPropagation();
-    if (window.confirm('Are you sure you want to remove this medical history record?')) {
-      setDiseases(diseases.filter(d => d.id !== id));
-      if (activeDetails && activeDetails.id === id) {
-        setActiveDetails(null);
+  // ==========================================
+  // 2. ADD CONDITION TO BACKEND (POST API)
+  // ==========================================
+  const handleAddCondition = async (e) => {
+    e.preventDefault();
+
+    if (!conditionName.trim() || !diagDate.trim()) {
+      alert('Please enter both Condition Name and Diagnosis Date.');
+      return;
+    }
+
+    // Exact payload key mapping matching PreviousDisease.js schema
+    const payload = {
+      userId,
+      diseaseName: conditionName.trim(),
+      category: category || 'RESPIRATORY',
+      diagnosedDate: diagDate.trim(),
+      status: 'Ongoing',
+      treatingDoctor: doctorName.trim() || 'Attending Physician',
+      notes: notes.trim() || 'No additional notes provided.'
+    };
+
+    try {
+      const response = await fetch('http://localhost:5000/api/previous-diseases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const saved = await response.json();
+
+        const newDisease = {
+          id: saved._id,
+          name: saved.diseaseName,
+          category: saved.category,
+          diagnosed: saved.diagnosedDate,
+          status: saved.status || 'Ongoing',
+          doctor: saved.treatingDoctor,
+          notes: saved.notes
+        };
+
+        setDiseases([newDisease, ...diseases]);
+        setIsModalOpen(false);
+
+        // Reset form fields
+        setConditionName('');
+        setCategory('RESPIRATORY');
+        setDiagDate('');
+        setDoctorName('');
+        setNotes('');
+      } else {
+        const errData = await response.json();
+        alert(`Failed to save condition: ${errData.error || 'Server validation error'}`);
       }
+    } catch (error) {
+      console.error('Error saving condition:', error);
+      alert('Network error connecting to http://localhost:5000');
+    }
+  };
+
+  // ==========================================
+  // 3. DELETE CONDITION (DELETE API)
+  // ==========================================
+  const handleDelete = async (id, e) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to remove this medical history record?')) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/previous-diseases/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        setDiseases(diseases.filter(d => d.id !== id));
+        if (activeDetails && activeDetails.id === id) {
+          setActiveDetails(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error removing record:', error);
     }
   };
 
   const filteredDiseases = diseases.filter(d => 
-    d.name.toLowerCase().includes(search.toLowerCase()) || 
-    d.category.toLowerCase().includes(search.toLowerCase())
+    d.name?.toLowerCase().includes(search.toLowerCase()) || 
+    d.category?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-24">
+    <div className="space-y-6 max-w-4xl mx-auto pb-24 font-sans">
       {/* Top Header & Action */}
       <div className="flex justify-between items-center">
         <div>
@@ -82,8 +145,9 @@ export default function PreviousDiseases() {
           <p className="text-slate-500 text-sm mt-0.5">Track your past medical history, diagnoses, and clinical notes.</p>
         </div>
         <button 
+          type="button"
           onClick={() => setIsModalOpen(true)}
-          className="bg-teal-800 hover:bg-teal-900 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-sm transition flex items-center gap-2"
+          className="bg-teal-800 hover:bg-teal-900 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-sm transition flex items-center gap-2 cursor-pointer"
         >
           <span>+</span> Add Condition
         </button>
@@ -115,7 +179,7 @@ export default function PreviousDiseases() {
               className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm flex justify-between items-center cursor-pointer hover:border-teal-300 transition"
             >
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-teal-50 text-teal-700 rounded-2xl flex items-center justify-center font-bold text-lg">
+                <div className="w-12 h-12 bg-teal-50 text-teal-700 rounded-2xl flex items-center justify-center font-bold text-lg shrink-0">
                   🩺
                 </div>
                 <div>
@@ -136,8 +200,9 @@ export default function PreviousDiseases() {
                   {d.status}
                 </span>
                 <button 
+                  type="button"
                   onClick={(e) => handleDelete(d.id, e)} 
-                  className="text-slate-300 hover:text-rose-500 p-2 font-bold transition"
+                  className="text-slate-300 hover:text-rose-500 p-2 font-bold transition cursor-pointer"
                   title="Delete record"
                 >
                   ✕
@@ -154,7 +219,7 @@ export default function PreviousDiseases() {
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-slate-900">Add Past Condition</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold text-xl">&times;</button>
+              <button type="button" onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold text-xl cursor-pointer">&times;</button>
             </div>
 
             <form onSubmit={handleAddCondition} className="space-y-4">
@@ -166,7 +231,7 @@ export default function PreviousDiseases() {
                   placeholder="e.g., Asthma / Migraine" 
                   value={conditionName} 
                   onChange={e => setConditionName(e.target.value)} 
-                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700" 
+                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700 text-sm" 
                 />
               </div>
 
@@ -175,7 +240,7 @@ export default function PreviousDiseases() {
                 <select 
                   value={category} 
                   onChange={e => setCategory(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700 bg-white"
+                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700 bg-white text-sm"
                 >
                   <option value="RESPIRATORY">RESPIRATORY</option>
                   <option value="CARDIOVASCULAR">CARDIOVASCULAR</option>
@@ -193,7 +258,7 @@ export default function PreviousDiseases() {
                   placeholder="e.g., March 2024" 
                   value={diagDate} 
                   onChange={e => setDiagDate(e.target.value)} 
-                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700" 
+                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700 text-sm" 
                 />
               </div>
 
@@ -204,7 +269,7 @@ export default function PreviousDiseases() {
                   placeholder="e.g., Dr. Alex River" 
                   value={doctorName} 
                   onChange={e => setDoctorName(e.target.value)} 
-                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700" 
+                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700 text-sm" 
                 />
               </div>
 
@@ -223,13 +288,13 @@ export default function PreviousDiseases() {
                 <button 
                   type="button" 
                   onClick={() => setIsModalOpen(false)} 
-                  className="flex-1 border border-slate-300 py-2.5 rounded-xl text-slate-600 font-medium hover:bg-slate-50 transition"
+                  className="flex-1 border border-slate-300 py-2.5 rounded-xl text-slate-600 font-medium hover:bg-slate-50 transition text-sm cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit" 
-                  className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium shadow transition"
+                  className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium shadow transition text-sm cursor-pointer"
                 >
                   Save Condition
                 </button>
@@ -245,7 +310,7 @@ export default function PreviousDiseases() {
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-slate-900">{activeDetails.name}</h3>
-              <button onClick={() => setActiveDetails(null)} className="text-slate-400 hover:text-slate-600 font-bold text-xl">&times;</button>
+              <button type="button" onClick={() => setActiveDetails(null)} className="text-slate-400 hover:text-slate-600 font-bold text-xl cursor-pointer">&times;</button>
             </div>
             
             <div className="space-y-4 mb-6">
@@ -267,8 +332,9 @@ export default function PreviousDiseases() {
             </div>
 
             <button 
+              type="button"
               onClick={() => setActiveDetails(null)} 
-              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow"
+              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow text-sm cursor-pointer"
             >
               Close
             </button>
