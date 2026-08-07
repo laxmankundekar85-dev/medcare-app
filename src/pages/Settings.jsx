@@ -92,17 +92,9 @@ export default function Settings({ onLogout }) {
 
   return (
     <div className="p-6 max-w-4xl mx-auto pb-32 font-sans text-gray-900">
-      {/* Top Header */}
-      <div className="flex justify-between items-center mb-6">
-        <button type="button" onClick={() => alert('Going back...')} className="font-bold text-lg cursor-pointer">
-          ←
-        </button>
+      {/* Clean Centered Header without back arrow or right avatar */}
+      <div className="mb-6 text-center">
         <h1 className="text-xl font-bold">Settings</h1>
-        <img 
-          src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" 
-          alt="Avatar" 
-          className="w-9 h-9 rounded-full object-cover border border-gray-200"
-        />
       </div>
 
       {/* User Info Card */}
