@@ -199,19 +199,9 @@ export default function Profile({ onLogout }) {
         className="hidden" 
       />
 
-      <div className="flex justify-between items-center mb-6">
-        <button type="button" onClick={() => alert('Navigating back')} className="text-gray-700 font-bold text-lg cursor-pointer">
-          ←
-        </button>
+      {/* Clean Centered Title Header */}
+      <div className="mb-6 text-center">
         <h1 className="text-xl font-bold text-gray-900">Profile</h1>
-        <button 
-          type="button"
-          onClick={() => openEditModal('name', 'Edit Name')}
-          className="text-gray-700 hover:text-teal-800 transition cursor-pointer"
-          title="Edit Profile"
-        >
-          ✏️
-        </button>
       </div>
 
       <div className="relative mb-16">
