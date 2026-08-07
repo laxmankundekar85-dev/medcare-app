@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 
 export default function Profile({ onLogout }) {
+  // 1. Read saved photo from localStorage first (Instant load on tab switch)
+  const savedLocalAvatar = localStorage.getItem('userAvatar');
+
   const [profile, setProfile] = useState({
     name: 'Laxman Babu Kundekar',
     patientId: '#MC-98442',
@@ -11,7 +14,7 @@ export default function Profile({ onLogout }) {
     email: 'laxman.kundekar@healthmail.com',
     phone: '+91 98765 43210',
     address: 'VIVA Institute of Technology, Virar, Mumbai',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
+    avatar: savedLocalAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
   });
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -56,7 +59,8 @@ export default function Profile({ onLogout }) {
           weight: data.weight ? String(data.weight) : prev.weight,
           email: data.email || prev.email,
           phone: data.phone || prev.phone,
-          avatar: data.avatar || prev.avatar // Loads saved photo from MongoDB
+          // Use DB avatar if present; otherwise keep localStorage or default
+          avatar: data.avatar || localStorage.getItem('userAvatar') || prev.avatar
         }));
       }
     } catch (error) {
@@ -72,7 +76,7 @@ export default function Profile({ onLogout }) {
   };
 
   // ==========================================
-  // 2. SAVE PROFILE FIELD CHANGES (PUT API)
+  // 2. SAVE FIELD CHANGES (PUT API)
   // ==========================================
   const handleSaveProfile = async (e) => {
     e.preventDefault();
@@ -106,7 +110,7 @@ export default function Profile({ onLogout }) {
   };
 
   // ==========================================
-  // 3. PERSIST PHOTO UPLOAD TO BACKEND (BASE64)
+  // 3. PERSIST PHOTO TO BOTH LOCALSTORAGE & API
   // ==========================================
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -116,10 +120,13 @@ export default function Profile({ onLogout }) {
     reader.onloadend = async () => {
       const base64Image = reader.result;
 
-      // Update UI state immediately
+      // A. Save immediately to LocalStorage so tab switches won't lose it
+      localStorage.setItem('userAvatar', base64Image);
+
+      // B. Update local UI state
       setProfile(prev => ({ ...prev, avatar: base64Image }));
 
-      // Persist Base64 image to MongoDB backend
+      // C. Send to MongoDB Backend
       try {
         const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
           method: 'PUT',
@@ -136,13 +143,10 @@ export default function Profile({ onLogout }) {
         });
 
         if (response.ok) {
-          alert('✅ Profile photo updated and saved to server!');
-        } else {
-          alert('❌ Failed to save photo to server.');
+          alert('✅ Profile photo saved!');
         }
       } catch (error) {
-        console.error('Error saving profile photo:', error);
-        alert('❌ Error connecting to server while saving photo.');
+        console.error('Error saving profile photo to server:', error);
       }
     };
 
