@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Menu, Bell, X, Home, Calendar, BriefcaseMedical, FileText, 
   User, Settings as SettingsIcon, Pill, Syringe, 
@@ -23,6 +23,9 @@ import PreviousDiseases from './pages/PreviousDiseases';
 export default function MedcareApp() {
   const [currentView, setCurrentView] = useState('login');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Reference for notification container to handle clicking outside
+  const notificationRef = useRef(null);
 
   // Dynamic User State from localStorage
   const [user, setUser] = useState(() => {
@@ -53,6 +56,25 @@ export default function MedcareApp() {
     { id: 2, title: 'Appointment Confirmed', desc: 'Dr. Alex River on Aug 12, 2026', time: '1h ago' },
     { id: 3, title: 'Health Report Ready', desc: 'Your weekly progress report is available', time: '1d ago' }
   ]);
+
+  // =========================================================
+  // CLOSE NOTIFICATION DROPDOWN ON OUTSIDE CLICK
+  // =========================================================
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+
+    if (showNotifications) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
 
   const handleOpenNotifications = () => {
     setShowNotifications(!showNotifications);
@@ -97,7 +119,8 @@ export default function MedcareApp() {
             <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userDisplayName)}`} alt="Avatar" />
           </div>
         ) : (
-          <div className="relative">
+          /* Wrapped container with ref to detect outside clicks */
+          <div className="relative" ref={notificationRef}>
             {/* Clickable Notification Button */}
             <button onClick={handleOpenNotifications} className="relative p-1 text-teal-800 hover:bg-teal-50 rounded-full transition cursor-pointer">
               <Bell size={24} />
