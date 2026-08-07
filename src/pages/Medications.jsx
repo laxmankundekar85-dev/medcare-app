@@ -6,23 +6,29 @@ export default function Medications() {
       id: 1, 
       name: 'Metformin', 
       dosage: '500mg • Twice daily', 
-      timing: 'Next: 8:00 PM', 
+      nextTiming: 'Next: 8:00 PM',
+      takenTiming: null,
+      isTaken: false,
       status: 'Active',
-      statusColor: 'bg-teal-50 text-teal-700 border border-teal-200'
+      statusColor: 'bg-emerald-50 text-emerald-700 border border-emerald-200'
     },
     { 
       id: 2, 
       name: 'Lisinopril', 
       dosage: '10.0mg • Once daily', 
-      timing: 'Taken: 09:15 AM ✓', 
+      nextTiming: null,
+      takenTiming: 'Taken: 09:15 AM ✓',
+      isTaken: true,
       status: 'Active',
-      statusColor: 'bg-teal-50 text-teal-700 border border-teal-200'
+      statusColor: 'bg-emerald-50 text-emerald-700 border border-emerald-200'
     },
     { 
       id: 3, 
       name: 'Atorvastatin', 
       dosage: '20mg • At bedtime', 
-      timing: 'Next: 10:30 PM', 
+      nextTiming: 'Next: 10:30 PM',
+      takenTiming: null,
+      isTaken: false,
       status: 'Upcoming',
       statusColor: 'bg-slate-100 text-slate-600 border border-slate-200'
     }
@@ -33,11 +39,31 @@ export default function Medications() {
   const [dosage, setDosage] = useState('');
   const [timing, setTiming] = useState('');
 
+  // Toggle dose taken/pending status reliably
+  const toggleTakenStatus = (id, e) => {
+    e.stopPropagation(); // Stops event bubbling
+    setMedications(prevMeds =>
+      prevMeds.map(med => {
+        if (med.id === id) {
+          const nextIsTaken = !med.isTaken;
+          const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          return {
+            ...med,
+            isTaken: nextIsTaken,
+            takenTiming: nextIsTaken ? `Taken: ${currentTime} ✓` : null,
+            nextTiming: !nextIsTaken ? (med.nextTiming || 'Next: Scheduled daily') : null
+          };
+        }
+        return med;
+      })
+    );
+  };
+
   // Handle removing a medication
   const handleDeleteMedication = (id, e) => {
     e.stopPropagation();
     if (window.confirm('Are you sure you want to remove this medication from your schedule?')) {
-      setMedications(medications.filter(med => med.id !== id));
+      setMedications(prevMeds => prevMeds.filter(med => med.id !== id));
     }
   };
 
@@ -50,12 +76,14 @@ export default function Medications() {
       id: Date.now(),
       name: medName,
       dosage: dosage,
-      timing: timing || 'Scheduled daily',
+      nextTiming: timing ? `Next: ${timing}` : 'Next: Scheduled daily',
+      takenTiming: null,
+      isTaken: false,
       status: 'Active',
-      statusColor: 'bg-teal-50 text-teal-700 border border-teal-200'
+      statusColor: 'bg-emerald-50 text-emerald-700 border border-emerald-200'
     };
 
-    setMedications([...medications, newMed]);
+    setMedications(prevMeds => [...prevMeds, newMed]);
     setIsAddModalOpen(false);
     
     // Reset form inputs
@@ -64,12 +92,12 @@ export default function Medications() {
     setTiming('');
   };
 
-  // Calculate dynamic completion percentage based on remaining active meds
-  const completedCount = medications.filter(m => m.timing.includes('Taken')).length;
+  // Calculate dynamic completion percentage based on taken medications
+  const completedCount = medications.filter(m => m.isTaken).length;
   const completionPercentage = medications.length > 0 ? Math.round((completedCount / medications.length) * 100) : 0;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-28">
+    <div className="space-y-6 max-w-4xl mx-auto pb-28 font-sans">
       {/* Progress Card Banner */}
       <div className="bg-teal-800 text-white p-6 rounded-3xl shadow-lg relative overflow-hidden">
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]"></div>
@@ -95,28 +123,45 @@ export default function Medications() {
           medications.map((med) => (
             <div 
               key={med.id} 
-              className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm flex justify-between items-center hover:border-teal-200 transition group"
+              className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-teal-200 transition"
             >
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-teal-50 text-teal-700 rounded-2xl flex items-center justify-center font-bold text-lg shadow-2xs">
+                <div className="w-12 h-12 bg-teal-50 text-teal-700 rounded-2xl flex items-center justify-center font-bold text-lg shadow-2xs shrink-0">
                   💊
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 text-base">{med.name}</h3>
                   <p className="text-xs text-slate-500 mt-0.5">{med.dosage}</p>
-                  <p className="text-xs text-teal-700 font-medium mt-1">{med.timing}</p>
+                  <p className={`text-xs font-semibold mt-1 ${med.isTaken ? 'text-emerald-600' : 'text-teal-700'}`}>
+                    {med.isTaken ? med.takenTiming : med.nextTiming}
+                  </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 self-end sm:self-auto">
+                {/* Fully Working Taken / Pending Button */}
+                <button
+                  type="button"
+                  onClick={(e) => toggleTakenStatus(med.id, e)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 transition active:scale-95 ${
+                    med.isTaken 
+                      ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300' 
+                      : 'bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300'
+                  }`}
+                >
+                  {med.isTaken ? '✓ Taken' : '⏳ Pending'}
+                </button>
+
+                {/* Status Badge */}
                 <span className={`text-xs font-semibold px-3 py-1 rounded-full ${med.statusColor}`}>
                   {med.status}
                 </span>
                 
                 {/* Delete / Remove Button */}
                 <button 
+                  type="button"
                   onClick={(e) => handleDeleteMedication(med.id, e)}
-                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-600 border border-slate-200 transition"
+                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-600 border border-slate-200 transition cursor-pointer"
                   title="Remove medication"
                 >
                   ✕
@@ -141,7 +186,11 @@ export default function Medications() {
             <p className="text-xs text-slate-400 mt-0.5">Setup reminders and dosage tracking</p>
           </div>
         </div>
-        <button className="bg-teal-800 hover:bg-teal-900 text-white px-5 py-2.5 rounded-2xl text-sm font-semibold shadow transition">
+        <button 
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setIsAddModalOpen(true); }}
+          className="bg-teal-800 hover:bg-teal-900 text-white px-5 py-2.5 rounded-2xl text-sm font-semibold shadow transition cursor-pointer"
+        >
           Add
         </button>
       </div>
@@ -153,8 +202,9 @@ export default function Medications() {
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-slate-900">Add New Medication</h3>
               <button 
+                type="button"
                 onClick={() => setIsAddModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 font-bold text-xl"
+                className="text-slate-400 hover:text-slate-600 font-bold text-xl cursor-pointer"
               >
                 &times;
               </button>
@@ -189,7 +239,7 @@ export default function Medications() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">Next Timing / Schedule (Optional)</label>
                 <input 
                   type="text" 
-                  placeholder="e.g., Next: 9:00 PM"
+                  placeholder="e.g., 9:00 PM"
                   value={timing}
                   onChange={(e) => setTiming(e.target.value)}
                   className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700 text-sm"
@@ -200,13 +250,13 @@ export default function Medications() {
                 <button 
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="flex-1 border border-slate-300 py-2.5 rounded-xl text-slate-600 font-medium hover:bg-slate-50 transition text-sm"
+                  className="flex-1 border border-slate-300 py-2.5 rounded-xl text-slate-600 font-medium hover:bg-slate-50 transition text-sm cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium shadow transition text-sm"
+                  className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium shadow transition text-sm cursor-pointer"
                 >
                   Save Medication
                 </button>
