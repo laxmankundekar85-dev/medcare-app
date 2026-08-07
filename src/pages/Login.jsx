@@ -7,32 +7,24 @@ import {
   signInWithEmailAndPassword, 
   signInWithPopup 
 } from '../firebase';
-
-// Dynamic Base URL: Switches between Vercel deployment IP fallback and local network IP
-const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (window.location.hostname.includes('vercel.app') 
-    ? 'http://192.168.1.34:5000' // Your PC's Wi-Fi IP
-    : `http://${window.location.hostname}:5000`);
+import { API_BASE_URL } from '../config';
 
 export default function Login({ onLogin }) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
 
-  // Form Inputs
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
 
-  // UI States
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Helper function to clear form inputs and messages
   const clearFormState = () => {
     setEmail('');
     setPassword('');
@@ -43,9 +35,6 @@ export default function Login({ onLogin }) {
     setSuccessMessage('');
   };
 
-  // ==========================================
-  // 1. HANDLE SIGN IN & REGISTER
-  // ==========================================
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -111,9 +100,6 @@ export default function Login({ onLogin }) {
     }
   };
 
-  // ==========================================
-  // 2. HANDLE REQUEST OTP (BACKEND API)
-  // ==========================================
   const handleSendOTP = async (e) => {
     e.preventDefault();
     setError('');
@@ -154,9 +140,6 @@ export default function Login({ onLogin }) {
     }
   };
 
-  // ==========================================
-  // 3. HANDLE VERIFY OTP & RESET PASSWORD
-  // ==========================================
   const handleVerifyAndReset = async (e) => {
     e.preventDefault();
     setError('');
@@ -198,9 +181,6 @@ export default function Login({ onLogin }) {
     }
   };
 
-  // ==========================================
-  // 4. HANDLE GOOGLE LOGIN
-  // ==========================================
   const handleGoogleLogin = async () => {
     setError('');
     setSuccessMessage('');
@@ -256,11 +236,9 @@ export default function Login({ onLogin }) {
           </div>
         )}
 
-        {/* FORGOT PASSWORD / OTP VIEW */}
         {isForgotPassword ? (
           <div>
             {!otpSent ? (
-              /* Step 1: Input Email to Request OTP */
               <form onSubmit={handleSendOTP} className="space-y-4" autoComplete="off">
                 <div>
                   <label className="block text-sm font-medium mb-1">Email Address</label>
@@ -287,7 +265,6 @@ export default function Login({ onLogin }) {
                 </button>
               </form>
             ) : (
-              /* Step 2: Input 6-Digit OTP and New Password */
               <form onSubmit={handleVerifyAndReset} className="space-y-4" autoComplete="off">
                 <div>
                   <label className="block text-sm font-medium mb-1">6-Digit Verification Code</label>
@@ -348,7 +325,6 @@ export default function Login({ onLogin }) {
             </button>
           </div>
         ) : (
-          /* STANDARD LOGIN / REGISTER VIEW */
           <>
             <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
               {isRegistering && (

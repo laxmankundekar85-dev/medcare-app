@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 
 export default function PatientProfile() {
   const [patientName, setPatientName] = useState('Laxman Babu Kundekar');
@@ -8,17 +9,15 @@ export default function PatientProfile() {
   const [tempName, setTempName] = useState(patientName);
   const [tempId, setTempId] = useState(patientId);
 
-  // Dynamic Firebase Auth UID or user identifier
   const userId = "sample_firebase_user_id";
 
-  // Fetch patient profile from MongoDB API on mount
   useEffect(() => {
     fetchProfile();
   }, [userId]);
 
   const fetchProfile = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/profile/${userId}`);
+      const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`);
       if (response.ok) {
         const data = await response.json();
         if (data.fullName) setPatientName(data.fullName);
@@ -34,7 +33,7 @@ export default function PatientProfile() {
     if (!tempName || !tempId) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/profile/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fullName: tempName, patientId: tempId })

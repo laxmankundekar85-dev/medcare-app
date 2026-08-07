@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 
 export default function Medications() {
   const [medications, setMedications] = useState([]);
@@ -7,22 +8,17 @@ export default function Medications() {
   const [dosage, setDosage] = useState('');
   const [timing, setTiming] = useState('');
 
-  // Replace this with your dynamic Firebase Auth user UID or auth context
   const userId = "sample_firebase_user_id"; 
 
-  // ==========================================
-  // 1. FETCH MEDICATIONS FROM MONGO DB
-  // ==========================================
   useEffect(() => {
     fetchMedications();
   }, [userId]);
 
   const fetchMedications = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/medications/${userId}`);
+      const response = await fetch(`${API_BASE_URL}/api/medications/${userId}`);
       if (response.ok) {
         const data = await response.json();
-        // Transform MongoDB documents to UI-compatible objects
         const formattedData = data.map(item => {
           const isTaken = item.status === 'Taken' || item.status === 'Completed';
           
@@ -47,9 +43,6 @@ export default function Medications() {
     }
   };
 
-  // ==========================================
-  // 2. TOGGLE TAKEN STATUS (PATCH API)
-  // ==========================================
   const toggleTakenStatus = async (id, e) => {
     e.stopPropagation();
 
@@ -60,7 +53,7 @@ export default function Medications() {
     const nextStatus = nextIsTaken ? 'Taken' : 'Active';
 
     try {
-      const response = await fetch(`http://localhost:5000/api/medications/${id}/toggle`, {
+      const response = await fetch(`${API_BASE_URL}/api/medications/${id}/toggle`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: nextStatus })
@@ -94,15 +87,12 @@ export default function Medications() {
     }
   };
 
-  // ==========================================
-  // 3. DELETE MEDICATION (DELETE API)
-  // ==========================================
   const handleDeleteMedication = async (id, e) => {
     e.stopPropagation();
     if (!window.confirm('Are you sure you want to remove this medication from your schedule?')) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/medications/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/medications/${id}`, {
         method: 'DELETE'
       });
 
@@ -114,9 +104,6 @@ export default function Medications() {
     }
   };
 
-  // ==========================================
-  // 4. ADD NEW MEDICATION (POST API)
-  // ==========================================
   const handleAddMedication = async (e) => {
     e.preventDefault();
     if (!medName || !dosage) return;
@@ -130,7 +117,7 @@ export default function Medications() {
     };
 
     try {
-      const response = await fetch('http://localhost:5000/api/medications', {
+      const response = await fetch(`${API_BASE_URL}/api/medications`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -154,7 +141,6 @@ export default function Medications() {
         setMedications(prevMeds => [...prevMeds, newMed]);
         setIsAddModalOpen(false);
 
-        // Reset form inputs
         setMedName('');
         setDosage('');
         setTiming('');
@@ -164,13 +150,11 @@ export default function Medications() {
     }
   };
 
-  // Calculate dynamic completion percentage
   const completedCount = medications.filter(m => m.isTaken).length;
   const completionPercentage = medications.length > 0 ? Math.round((completedCount / medications.length) * 100) : 0;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-28 font-sans">
-      {/* Progress Card Banner */}
       <div className="bg-teal-800 text-white p-6 rounded-3xl shadow-lg relative overflow-hidden">
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]"></div>
         <div className="relative z-10">
@@ -185,7 +169,6 @@ export default function Medications() {
         </div>
       </div>
 
-      {/* Medication Cards List */}
       <div className="space-y-4">
         {medications.length === 0 ? (
           <div className="text-center py-12 bg-white border border-slate-100 rounded-3xl shadow-sm">
@@ -211,7 +194,6 @@ export default function Medications() {
               </div>
 
               <div className="flex items-center gap-3 self-end sm:self-auto">
-                {/* Taken / Pending Toggle Button */}
                 <button
                   type="button"
                   onClick={(e) => toggleTakenStatus(med.id, e)}
@@ -224,12 +206,10 @@ export default function Medications() {
                   {med.isTaken ? '✓ Taken' : '⏳ Pending'}
                 </button>
 
-                {/* Status Badge */}
                 <span className={`text-xs font-semibold px-3 py-1 rounded-full ${med.statusColor}`}>
                   {med.status}
                 </span>
                 
-                {/* Delete / Remove Button */}
                 <button 
                   type="button"
                   onClick={(e) => handleDeleteMedication(med.id, e)}
@@ -244,7 +224,6 @@ export default function Medications() {
         )}
       </div>
 
-      {/* Add New Medication Trigger Bar */}
       <div 
         onClick={() => setIsAddModalOpen(true)}
         className="bg-white border-2 border-dashed border-slate-200 hover:border-teal-400 rounded-3xl p-5 shadow-sm flex justify-between items-center cursor-pointer transition group"
@@ -267,7 +246,6 @@ export default function Medications() {
         </button>
       </div>
 
-      {/* Add Medication Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">

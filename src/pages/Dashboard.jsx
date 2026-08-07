@@ -1,35 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { User, Activity, FileText, ChevronRight, Plus } from 'lucide-react';
 import { StatCard } from '../components/ui/Cards';
+import { API_BASE_URL } from '../config';
 
 export default function Dashboard() {
-  // Vitals state
   const [weight, setWeight] = useState(64);
   const [height, setHeight] = useState(175);
   const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
   const [isFabMenuOpen, setIsFabMenuOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
-  // Profile state
   const [patientName, setPatientName] = useState('Laxman');
   const [patientId, setPatientId] = useState('#MC8829');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [tempName, setTempName] = useState(patientName);
   const [tempId, setTempId] = useState(patientId);
 
-  // Live aggregated data from MongoDB
   const [medications, setMedications] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [alarms, setAlarms] = useState([]);
   const [injections, setInjections] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Dynamic Firebase Auth UID or user identifier
   const userId = "sample_firebase_user_id";
 
-  // ==========================================
-  // FETCH REAL-TIME DATA & PROFILE FROM API
-  // ==========================================
   useEffect(() => {
     fetchDashboardData();
     fetchUserProfile();
@@ -37,7 +31,7 @@ export default function Dashboard() {
 
   const fetchUserProfile = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/profile/${userId}`);
+      const res = await fetch(`${API_BASE_URL}/api/profile/${userId}`);
       if (res.ok) {
         const data = await res.json();
         if (data.weight) setWeight(Number(data.weight));
@@ -59,10 +53,10 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     try {
       const [medRes, apptRes, alarmRes, injRes] = await Promise.all([
-        fetch(`http://localhost:5000/api/medications/${userId}`),
-        fetch(`http://localhost:5000/api/appointments/${userId}`),
-        fetch(`http://localhost:5000/api/alarms/${userId}`),
-        fetch(`http://localhost:5000/api/injections/${userId}`)
+        fetch(`${API_BASE_URL}/api/medications/${userId}`),
+        fetch(`${API_BASE_URL}/api/appointments/${userId}`),
+        fetch(`${API_BASE_URL}/api/alarms/${userId}`),
+        fetch(`${API_BASE_URL}/api/injections/${userId}`)
       ]);
 
       if (medRes.ok) setMedications(await medRes.json());
@@ -76,17 +70,14 @@ export default function Dashboard() {
     }
   };
 
-  // Calculate dynamic BMI: weight (kg) / [height (m)]^2
   const heightInMeters = height / 100;
   const bmi = heightInMeters > 0 ? (weight / (heightInMeters * heightInMeters)).toFixed(1) : '20.9';
 
-  // Calculate dynamic stats
   const totalMeds = medications.length;
   const takenMeds = medications.filter(m => m.status === 'Taken' || m.status === 'Completed').length;
   const medProgress = totalMeds > 0 ? Math.round((takenMeds / totalMeds) * 100) : 0;
   const activeAlarmsCount = alarms.filter(a => a.isEnabled !== false && a.active !== false).length;
 
-  // Quick action states for the floating action button
   const handleQuickAction = (action) => {
     setIsFabMenuOpen(false);
     if (action === 'vitals') {
@@ -102,12 +93,9 @@ export default function Dashboard() {
     }
   };
 
-  // ==========================================
-  // PERSIST VITALS UPDATE TO MONGODB
-  // ==========================================
   const handleSaveVitals = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/profile/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -126,15 +114,12 @@ export default function Dashboard() {
     }
   };
 
-  // ==========================================
-  // PERSIST PROFILE UPDATE TO MONGODB
-  // ==========================================
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     if (!tempName || !tempId) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/profile/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -157,7 +142,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 pb-24 relative font-sans" onClick={() => setIsFabMenuOpen(false)}>
-      {/* Clickable Header Section to open Profile Edit Modal */}
       <div 
         className="flex justify-between items-start bg-white p-5 rounded-3xl border border-slate-100 shadow-sm cursor-pointer hover:border-teal-700 transition" 
         onClick={() => { setTempName(patientName); setTempId(patientId); setIsProfileModalOpen(true); }}
@@ -174,7 +158,6 @@ export default function Dashboard() {
         </span>
       </div>
 
-      {/* Dynamic Summary Cards Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm text-center">
           <span className="text-2xl">💊</span>
@@ -201,7 +184,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Vitals Overview */}
       <div>
         <div className="flex justify-between items-center mb-3">
           <h3 className="text-sm font-bold text-slate-500 tracking-wider">HEALTH OVERVIEW</h3>
@@ -210,7 +192,6 @@ export default function Dashboard() {
           </a>
         </div>
         
-        {/* Clickable StatCards to trigger Vitals update */}
         <div className="flex gap-4 overflow-x-auto pb-2">
           <div onClick={() => setIsVitalsModalOpen(true)} className="cursor-pointer flex-1 min-w-[120px]">
             <StatCard icon={<User size={16}/>} label="WEIGHT" value={weight} unit="kg" />
@@ -224,7 +205,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Heart Rate Activity Chart */}
       <div className="bg-slate-100 rounded-3xl p-5 border border-slate-200">
         <h3 className="font-bold text-slate-900 mb-1">Heart Rate Activity</h3>
         <p className="text-xs text-slate-500 mb-4">Real-time monitoring</p>
@@ -235,7 +215,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Health Insight Card */}
       <div className="bg-slate-100 rounded-3xl p-5 border border-slate-200">
         <div className="flex items-center gap-3 mb-3">
           <div className="p-2 bg-teal-800 text-white rounded-full"><Activity size={20} /></div>
@@ -251,7 +230,6 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Floating Action Button & Popup Menu */}
       <div className="fixed bottom-24 right-6 z-50" onClick={(e) => e.stopPropagation()}>
         {isFabMenuOpen && (
           <div className="absolute bottom-16 right-0 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 w-52 space-y-1 mb-2">
@@ -295,7 +273,6 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Edit Vitals Modal */}
       {isVitalsModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl">
@@ -347,7 +324,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Edit Profile & ID Modal */}
       {isProfileModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl">
@@ -405,7 +381,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Full Health Report Modal */}
       {isReportModalOpen && (
         <div 
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4" 

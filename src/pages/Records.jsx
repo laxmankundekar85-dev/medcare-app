@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../config';
 
 export default function Records() {
   const [records, setRecords] = useState([]);
@@ -42,7 +43,7 @@ export default function Records() {
 
   const fetchRecords = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/records/${userId}`);
+      const response = await fetch(`${API_BASE_URL}/api/records/${userId}`);
       if (response.ok) {
         const data = await response.json();
         
@@ -113,7 +114,7 @@ export default function Records() {
     };
 
     try {
-      const response = await fetch('http://localhost:5000/api/records', {
+      const response = await fetch(`${API_BASE_URL}/api/records`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -151,7 +152,7 @@ export default function Records() {
   // ==========================================
   const handleDelete = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/records/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/records/${id}`, {
         method: 'DELETE'
       });
 

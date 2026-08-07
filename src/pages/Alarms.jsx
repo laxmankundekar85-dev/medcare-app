@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../config';
 
 export default function Alarms() {
   const [reminders, setReminders] = useState([]);
@@ -9,45 +10,36 @@ export default function Alarms() {
   const [reminderLabel, setReminderLabel] = useState('');
   const [triggeredIds, setTriggeredIds] = useState(new Set());
 
-  // Active Alarm State (For 30-Sec Alarm & Stop Function)
   const [activeAlarmingRem, setActiveAlarmingRem] = useState(null);
   
-  // Audio Context and Interval References
   const audioCtxRef = useRef(null);
   const alarmSoundIntervalRef = useRef(null);
   const autoStopTimeoutRef = useRef(null);
 
-  // Replace with your dynamic Firebase Auth user UID or context variable
   const userId = "sample_firebase_user_id";
 
-  // Request browser notification permission on mount
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
   }, []);
 
-  // Clean up audio on component unmount
   useEffect(() => {
     return () => {
       stopAlarmSound();
     };
   }, []);
 
-  // ==========================================
-  // 1. FETCH REMINDERS / ALARMS FROM API
-  // ==========================================
   useEffect(() => {
     fetchAlarms();
   }, [userId]);
 
   const fetchAlarms = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/alarms/${userId}`);
+      const response = await fetch(`${API_BASE_URL}/api/alarms/${userId}`);
       if (response.ok) {
         const data = await response.json();
         
-        // Format MongoDB data to align with UI state
         const formatted = data.map(item => {
           const timeParts = item.time ? item.time.split(' ') : ['08:00', 'AM'];
           const parsedTime = timeParts[0] || item.time;
@@ -71,9 +63,6 @@ export default function Alarms() {
     }
   };
 
-  // ==========================================
-  // 2. REAL-TIME ALARM SCHEDULER & LISTENER
-  // ==========================================
   useEffect(() => {
     const alarmInterval = setInterval(() => {
       const now = new Date();
@@ -106,11 +95,8 @@ export default function Alarms() {
     return () => clearInterval(alarmInterval);
   }, [reminders, triggeredIds]);
 
-  // ==========================================
-  // 3. CONTINUOUS 30-SEC SOUND TONE CONTROLLER
-  // ==========================================
   const startContinuousAlarmSound = () => {
-    stopAlarmSound(); // Stop any existing audio first
+    stopAlarmSound();
 
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -126,24 +112,22 @@ export default function Alarms() {
           const gain = audioCtxRef.current.createGain();
           
           osc.type = 'sine';
-          osc.frequency.setValueAtTime(880, audioCtxRef.current.currentTime); // A5 tone
+          osc.frequency.setValueAtTime(880, audioCtxRef.current.currentTime);
           gain.gain.setValueAtTime(0.4, audioCtxRef.current.currentTime);
           
           osc.connect(gain);
           gain.connect(audioCtxRef.current.destination);
           
           osc.start();
-          osc.stop(audioCtxRef.current.currentTime + 0.4); // 0.4 second beep
+          osc.stop(audioCtxRef.current.currentTime + 0.4);
         } catch (e) {
           console.error("Beep error:", e);
         }
       };
 
-      // Play immediate beep, then loop every 800ms
       playBeep();
       alarmSoundIntervalRef.current = setInterval(playBeep, 800);
 
-      // Auto-stop audio sound automatically after 30 seconds
       autoStopTimeoutRef.current = setTimeout(() => {
         stopAlarmSound();
       }, 30000);
@@ -174,15 +158,10 @@ export default function Alarms() {
     }
   };
 
-  // Trigger procedure when time hits
   const triggerAlarmAlert = (rem) => {
-    // 1. Show ringing UI Modal
     setActiveAlarmingRem(rem);
-
-    // 2. Play 30-second continuous audio
     startContinuousAlarmSound();
 
-    // 3. Trigger Browser Native Push Notification
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification(`⏰ Medication Reminder: ${rem.label}`, {
         body: `Time for your ${rem.type} dose scheduled at ${rem.time} ${rem.period}.`,
@@ -191,18 +170,14 @@ export default function Alarms() {
     }
   };
 
-  // Manual User Stop Action Button
   const handleUserStopAlarm = () => {
     stopAlarmSound();
     setActiveAlarmingRem(null);
   };
 
-  // ==========================================
-  // 4. TOGGLE ACTIVE STATUS (PATCH API)
-  // ==========================================
   const handleToggle = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/alarms/${id}/toggle`, {
+      const response = await fetch(`${API_BASE_URL}/api/alarms/${id}/toggle`, {
         method: 'PATCH'
       });
 
@@ -221,14 +196,11 @@ export default function Alarms() {
     }
   };
 
-  // ==========================================
-  // 5. DELETE REMINDER (DELETE API)
-  // ==========================================
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this reminder?')) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/alarms/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/alarms/${id}`, {
         method: 'DELETE'
       });
 
@@ -240,9 +212,6 @@ export default function Alarms() {
     }
   };
 
-  // ==========================================
-  // 6. ADD NEW REMINDER (POST API)
-  // ==========================================
   const handleAddReminder = async (e) => {
     e.preventDefault();
     if (!reminderTime || !reminderLabel) return;
@@ -264,7 +233,7 @@ export default function Alarms() {
     };
 
     try {
-      const response = await fetch('http://localhost:5000/api/alarms', {
+      const response = await fetch(`${API_BASE_URL}/api/alarms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -297,13 +266,11 @@ export default function Alarms() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto pb-32 relative font-sans">
-      {/* Date Header */}
       <p className="text-gray-400 text-sm font-medium mb-1">
         {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
       </p>
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Medication Reminders</h1>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-teal-800 text-white rounded-3xl p-6 shadow-sm">
           <div className="text-teal-200 text-xl mb-2">⏰</div>
@@ -317,7 +284,6 @@ export default function Alarms() {
         </div>
       </div>
 
-      {/* Reminders List */}
       <div className="space-y-4 mb-6">
         {reminders.length === 0 ? (
           <div className="text-center py-12 bg-white border border-gray-100 rounded-3xl shadow-sm">
@@ -346,7 +312,6 @@ export default function Alarms() {
                 >
                   ✕
                 </button>
-                {/* Toggle Switch */}
                 <button
                   type="button"
                   onClick={() => handleToggle(rem.id)}
@@ -362,7 +327,6 @@ export default function Alarms() {
         )}
       </div>
 
-      {/* Set New Reminder Dashed Button */}
       <div
         onClick={() => setIsModalOpen(true)}
         className="border-2 border-dashed border-gray-300 hover:border-teal-700 bg-white/50 rounded-3xl p-5 text-center cursor-pointer transition flex items-center justify-center gap-2 text-teal-800 font-semibold shadow-sm"
@@ -370,7 +334,6 @@ export default function Alarms() {
         <span className="text-xl">⏰</span> Set New Reminder
       </div>
 
-      {/* Floating Add Action Button */}
       <button
         type="button"
         onClick={() => setIsModalOpen(true)}
@@ -380,9 +343,6 @@ export default function Alarms() {
         +
       </button>
 
-      {/* ==========================================
-          RINGING ALARM POPUP MODAL (30 SECONDS)
-      ========================================== */}
       {activeAlarmingRem && (
         <div className="fixed inset-0 bg-teal-950/80 backdrop-blur-md flex justify-center items-center z-50 p-4 animate-fade-in">
           <div className="bg-white rounded-3xl max-w-sm w-full p-8 shadow-2xl text-center space-y-6 border-4 border-teal-500 animate-bounce-short">
@@ -416,7 +376,6 @@ export default function Alarms() {
         </div>
       )}
 
-      {/* Set New Reminder Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">

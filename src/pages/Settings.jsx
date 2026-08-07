@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 
 export default function Settings({ onLogout }) {
   const [account, setAccount] = useState({
@@ -44,7 +45,7 @@ export default function Settings({ onLogout }) {
 
   const fetchProfile = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/profile/${userId}`);
+      const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`);
       if (response.ok) {
         const data = await response.json();
         if (data.fullName) {
@@ -67,7 +68,7 @@ export default function Settings({ onLogout }) {
     e.preventDefault();
 
     try {
-      const response = await fetch(`http://localhost:5000/api/profile/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fullName: newName })

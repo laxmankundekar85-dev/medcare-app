@@ -33,7 +33,7 @@ export default function MedcareApp() {
     }
   });
 
-  // Update user state whenever currentView changes (e.g. after logging in)
+  // Update user state whenever currentView changes (e.g., after logging in)
   useEffect(() => {
     try {
       const storedUser = JSON.parse(localStorage.getItem('user'));
@@ -69,6 +69,12 @@ export default function MedcareApp() {
     setShowNotifications(false);
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    setUser({ displayName: 'Patient' });
+    navigateTo('login');
+  };
+
   if (currentView === 'login') {
     return <Login onLogin={() => navigateTo('dashboard')} />;
   }
@@ -87,9 +93,9 @@ export default function MedcareApp() {
         </div>
 
         {currentView === 'profile' || currentView === 'settings' ? (
-           <div className="w-8 h-8 rounded-full bg-slate-300 overflow-hidden">
-             <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userDisplayName)}`} alt="Avatar" />
-           </div>
+          <div className="w-8 h-8 rounded-full bg-slate-300 overflow-hidden">
+            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userDisplayName)}`} alt="Avatar" />
+          </div>
         ) : (
           <div className="relative">
             {/* Clickable Notification Button */}
@@ -141,13 +147,13 @@ export default function MedcareApp() {
             onClick={e => e.stopPropagation()}
           >
             <div className="p-6 flex items-center gap-4 border-b border-slate-200">
-               <div className="w-12 h-12 rounded-full bg-slate-300 overflow-hidden">
-                 <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userDisplayName)}`} alt="User" />
-               </div>
-               <div>
-                 <h2 className="font-bold text-lg">{userDisplayName}</h2>
-                 <p className="text-sm text-slate-500">Patient ID: #MC8829</p>
-               </div>
+              <div className="w-12 h-12 rounded-full bg-slate-300 overflow-hidden">
+                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userDisplayName)}`} alt="User" />
+              </div>
+              <div>
+                <h2 className="font-bold text-lg">{userDisplayName}</h2>
+                <p className="text-sm text-slate-500">Patient ID: #MC8829</p>
+              </div>
             </div>
 
             <nav className="flex-1 overflow-y-auto py-4 px-4 space-y-2">
@@ -186,8 +192,8 @@ export default function MedcareApp() {
         {currentView === 'injections' && <Injections />}
         {currentView === 'records' && <Records />}
         {currentView === 'diseases' && <PreviousDiseases />}
-        {currentView === 'profile' && <Profile onLogout={() => navigateTo('login')} />}
-        {currentView === 'settings' && <Settings onLogout={() => navigateTo('login')} />}
+        {currentView === 'profile' && <Profile onLogout={handleLogout} />}
+        {currentView === 'settings' && <Settings onLogout={handleLogout} />}
       </main>
 
       {/* Bottom Navigation */}

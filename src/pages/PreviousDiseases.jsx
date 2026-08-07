@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 
 export default function PreviousDiseases() {
   const [diseases, setDiseases] = useState([]);
@@ -6,30 +7,24 @@ export default function PreviousDiseases() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeDetails, setActiveDetails] = useState(null);
 
-  // Form state for adding new condition
   const [conditionName, setConditionName] = useState('');
   const [category, setCategory] = useState('RESPIRATORY');
   const [diagDate, setDiagDate] = useState('');
   const [doctorName, setDoctorName] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Dynamic Firebase Auth UID or user identifier
   const userId = "sample_firebase_user_id";
 
-  // ==========================================
-  // 1. FETCH CONDITIONS FROM BACKEND API
-  // ==========================================
   useEffect(() => {
     fetchDiseases();
   }, [userId]);
 
   const fetchDiseases = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/previous-diseases/${userId}`);
+      const response = await fetch(`${API_BASE_URL}/api/previous-diseases/${userId}`);
       if (response.ok) {
         const data = await response.json();
 
-        // Format data keys safely for frontend rendering
         const formatted = data.map(item => ({
           id: item._id,
           name: item.diseaseName || 'Unnamed Condition',
@@ -47,9 +42,6 @@ export default function PreviousDiseases() {
     }
   };
 
-  // ==========================================
-  // 2. ADD CONDITION TO BACKEND (POST API)
-  // ==========================================
   const handleAddCondition = async (e) => {
     e.preventDefault();
 
@@ -58,7 +50,6 @@ export default function PreviousDiseases() {
       return;
     }
 
-    // Exact payload key mapping matching PreviousDisease.js schema
     const payload = {
       userId,
       diseaseName: conditionName.trim(),
@@ -70,7 +61,7 @@ export default function PreviousDiseases() {
     };
 
     try {
-      const response = await fetch('http://localhost:5000/api/previous-diseases', {
+      const response = await fetch(`${API_BASE_URL}/api/previous-diseases`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -92,7 +83,6 @@ export default function PreviousDiseases() {
         setDiseases([newDisease, ...diseases]);
         setIsModalOpen(false);
 
-        // Reset form fields
         setConditionName('');
         setCategory('RESPIRATORY');
         setDiagDate('');
@@ -104,19 +94,16 @@ export default function PreviousDiseases() {
       }
     } catch (error) {
       console.error('Error saving condition:', error);
-      alert('Network error connecting to http://localhost:5000');
+      alert('Network error connecting to backend API');
     }
   };
 
-  // ==========================================
-  // 3. DELETE CONDITION (DELETE API)
-  // ==========================================
   const handleDelete = async (id, e) => {
     e.stopPropagation();
     if (!window.confirm('Are you sure you want to remove this medical history record?')) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/previous-diseases/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/previous-diseases/${id}`, {
         method: 'DELETE'
       });
 
@@ -138,7 +125,6 @@ export default function PreviousDiseases() {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-24 font-sans">
-      {/* Top Header & Action */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Previous Diseases & Conditions</h1>
@@ -153,7 +139,6 @@ export default function PreviousDiseases() {
         </button>
       </div>
 
-      {/* Search Bar */}
       <div className="relative">
         <input 
           type="text" 
@@ -165,7 +150,6 @@ export default function PreviousDiseases() {
         <span className="absolute left-4 top-3.5 text-slate-400 text-lg">🔍</span>
       </div>
 
-      {/* List of Conditions */}
       <div className="space-y-4">
         {filteredDiseases.length === 0 ? (
           <div className="text-center py-12 bg-white border border-slate-100 rounded-3xl shadow-sm">
@@ -213,7 +197,6 @@ export default function PreviousDiseases() {
         )}
       </div>
 
-      {/* Add Condition Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
@@ -304,7 +287,6 @@ export default function PreviousDiseases() {
         </div>
       )}
 
-      {/* Details Modal */}
       {activeDetails && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 
-// Notice the new onLogout prop here
 export default function Profile({ onLogout }) {
   const [profile, setProfile] = useState({
     name: 'Laxman Babu Kundekar',
@@ -15,14 +15,12 @@ export default function Profile({ onLogout }) {
   });
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [activeSubView, setActiveSubView] = useState(null); // 'medical', 'privacy', 'notifications'
+  const [activeSubView, setActiveSubView] = useState(null);
 
-  // Edit form state
   const [editField, setEditField] = useState('');
   const [editVal, setEditVal] = useState('');
   const [modalTitle, setModalTitle] = useState('');
 
-  // Interactive Settings Toggles State
   const [notifSettings, setNotifSettings] = useState({
     push: true,
     sms: true,
@@ -36,19 +34,15 @@ export default function Profile({ onLogout }) {
     twoFactor: true
   });
 
-  // Dynamic Firebase Auth UID or user identifier
   const userId = "sample_firebase_user_id";
 
-  // ==========================================
-  // 1. FETCH PROFILE FROM BACKEND API
-  // ==========================================
   useEffect(() => {
     fetchProfile();
   }, [userId]);
 
   const fetchProfile = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/profile/${userId}`);
+      const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`);
       if (response.ok) {
         const data = await response.json();
         setProfile(prev => ({
@@ -73,15 +67,11 @@ export default function Profile({ onLogout }) {
     setIsEditModalOpen(true);
   };
 
-  // ==========================================
-  // 2. SAVE PROFILE CHANGES (PUT API)
-  // ==========================================
   const handleSaveProfile = async (e) => {
     e.preventDefault();
 
     const updatedProfile = { ...profile, [editField]: editVal };
 
-    // Prepare API payload mapping
     const payload = {
       fullName: updatedProfile.name,
       patientId: updatedProfile.patientId,
@@ -92,7 +82,7 @@ export default function Profile({ onLogout }) {
     };
 
     try {
-      const response = await fetch(`http://localhost:5000/api/profile/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -107,7 +97,6 @@ export default function Profile({ onLogout }) {
     }
   };
 
-  // Handle Personal Photo Upload
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -118,7 +107,6 @@ export default function Profile({ onLogout }) {
 
   return (
     <div className="p-6 max-w-4xl mx-auto pb-32 font-sans">
-      {/* Top Header */}
       <div className="flex justify-between items-center mb-6">
         <button type="button" onClick={() => alert('Navigating back')} className="text-gray-700 font-bold text-lg cursor-pointer">
           ←
@@ -134,7 +122,6 @@ export default function Profile({ onLogout }) {
         </button>
       </div>
 
-      {/* Banner & Avatar with Photo Upload */}
       <div className="relative mb-16">
         <div className="bg-teal-700 h-32 rounded-3xl relative overflow-hidden flex items-center justify-center">
           <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]"></div>
@@ -150,7 +137,6 @@ export default function Profile({ onLogout }) {
               />
             </div>
             
-            {/* Hover Camera Overlay */}
             <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white text-[11px] font-semibold text-center px-1">
               📷 Change Photo
             </div>
@@ -168,13 +154,11 @@ export default function Profile({ onLogout }) {
         </div>
       </div>
 
-      {/* Name & ID */}
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900">{profile.name}</h2>
         <p className="text-xs text-gray-400 mt-0.5">Patient ID: {profile.patientId}</p>
       </div>
 
-      {/* Stat Cards */}
       <div className="grid grid-cols-3 gap-3 mb-8">
         <div 
           onClick={() => openEditModal('bloodGroup', 'Blood Group')}
@@ -199,7 +183,6 @@ export default function Profile({ onLogout }) {
         </div>
       </div>
 
-      {/* Personal Information */}
       <div className="mb-8">
         <h3 className="text-xs font-bold text-gray-400 tracking-wider mb-3">PERSONAL INFORMATION</h3>
         <div className="bg-white border border-gray-100 rounded-3xl shadow-sm divide-y divide-gray-100">
@@ -247,7 +230,6 @@ export default function Profile({ onLogout }) {
         </div>
       </div>
 
-      {/* Medical Summary */}
       <div className="mb-8">
         <h3 className="text-xs font-bold text-gray-400 tracking-wider mb-3">MEDICAL SUMMARY</h3>
         <div className="space-y-3">
@@ -281,7 +263,6 @@ export default function Profile({ onLogout }) {
         </div>
       </div>
 
-      {/* Settings & Actions */}
       <div className="space-y-3 mb-8">
         <div 
           onClick={() => setActiveSubView('privacy')}
@@ -305,7 +286,6 @@ export default function Profile({ onLogout }) {
           <span className="text-gray-400 font-bold">›</span>
         </div>
 
-        {/* Updated Logout Button */}
         <button 
           type="button"
           onClick={onLogout}
@@ -315,7 +295,6 @@ export default function Profile({ onLogout }) {
         </button>
       </div>
 
-      {/* Edit Modal */}
       {isEditModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
@@ -362,7 +341,6 @@ export default function Profile({ onLogout }) {
         </div>
       )}
 
-      {/* Interactive Sub-Modals (Notifications, Privacy, Medical) */}
       {activeSubView === 'notifications' && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">

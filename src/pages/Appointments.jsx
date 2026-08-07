@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 
 export default function Appointments() {
   const [selectedDate, setSelectedDate] = useState('Mon 12');
@@ -39,19 +40,15 @@ export default function Appointments() {
 
   const [activeSummary, setActiveSummary] = useState(null);
 
-  // Dynamic user context ID (replace with actual Firebase Auth UID if needed)
   const userId = "sample_firebase_user_id";
 
-  // ==========================================
-  // 1. FETCH APPOINTMENTS FROM BACKEND API
-  // ==========================================
   useEffect(() => {
     fetchAppointments();
   }, [userId]);
 
   const fetchAppointments = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/appointments/${userId}`);
+      const response = await fetch(`${API_BASE_URL}/api/appointments/${userId}`);
       if (response.ok) {
         const data = await response.json();
         const formatted = data.map(item => ({
@@ -69,14 +66,11 @@ export default function Appointments() {
     }
   };
 
-  // ==========================================
-  // 2. CANCEL APPOINTMENT (DELETE API)
-  // ==========================================
   const handleCancel = async (id) => {
     if (!window.confirm('Are you sure you want to cancel this appointment?')) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/appointments/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/appointments/${id}`, {
         method: 'DELETE'
       });
 
@@ -89,9 +83,6 @@ export default function Appointments() {
     }
   };
 
-  // ==========================================
-  // 3. RESCHEDULE APPOINTMENT
-  // ==========================================
   const handleReschedule = (id) => {
     const newDate = prompt('Enter new date (e.g., Aug 20, 2024):');
     const newTime = prompt('Enter new time (e.g., 11:00 AM):');
@@ -101,9 +92,6 @@ export default function Appointments() {
     }
   };
 
-  // ==========================================
-  // 4. ADD NEW APPOINTMENT (POST API)
-  // ==========================================
   const handleAddAppointment = async (e) => {
     e.preventDefault();
     if (!docName || !appDate) return;
@@ -118,7 +106,7 @@ export default function Appointments() {
     };
 
     try {
-      const response = await fetch('http://localhost:5000/api/appointments', {
+      const response = await fetch(`${API_BASE_URL}/api/appointments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -148,7 +136,6 @@ export default function Appointments() {
     }
   };
 
-  // Dates for horizontal picker
   const datePickerList = [
     { day: 'Mon', date: '12' },
     { day: 'Tue', date: '13' },
@@ -160,7 +147,6 @@ export default function Appointments() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto pb-32 relative">
-      {/* Horizontal Date Picker */}
       <div className="flex gap-3 overflow-x-auto pb-4 mb-8 no-scrollbar">
         {datePickerList.map((item, idx) => {
           const identifier = `${item.day} ${item.date}`;
@@ -184,7 +170,6 @@ export default function Appointments() {
         })}
       </div>
 
-      {/* Upcoming Appointments Header */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold text-gray-900">Upcoming Appointments</h2>
         <button onClick={() => alert('Viewing all upcoming appointments')} className="text-sm font-semibold text-teal-800 hover:underline">
@@ -192,7 +177,6 @@ export default function Appointments() {
         </button>
       </div>
 
-      {/* Upcoming Appointments Cards */}
       <div className="space-y-4 mb-10">
         {upcoming.length === 0 ? (
           <p className="text-gray-400 text-sm italic bg-white p-6 rounded-3xl border border-gray-100 text-center">
@@ -245,10 +229,8 @@ export default function Appointments() {
         )}
       </div>
 
-      {/* Appointment History Header */}
       <h2 className="text-2xl font-bold text-gray-900 mb-4">Appointment History</h2>
 
-      {/* Appointment History Cards */}
       <div className="space-y-4">
         {history.map((hist) => (
           <div key={hist.id} className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
@@ -274,7 +256,6 @@ export default function Appointments() {
         ))}
       </div>
 
-      {/* Floating Add Action Button */}
       <button
         onClick={() => setIsModalOpen(true)}
         className="fixed bottom-24 right-6 bg-teal-800 hover:bg-teal-900 text-white w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-3xl transition duration-200 z-30 cursor-pointer"
@@ -283,7 +264,6 @@ export default function Appointments() {
         +
       </button>
 
-      {/* Add Appointment Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
@@ -365,7 +345,6 @@ export default function Appointments() {
         </div>
       )}
 
-      {/* Summary Modal */}
       {activeSummary && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">

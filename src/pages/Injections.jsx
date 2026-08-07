@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 
 export default function Injections() {
   const [injections, setInjections] = useState([]);
@@ -7,30 +8,24 @@ export default function Injections() {
   const [activeDetails, setActiveDetails] = useState(null);
   const [activeReschedule, setActiveReschedule] = useState(null);
 
-  // Form states
   const [injName, setInjName] = useState('');
   const [injDate, setInjDate] = useState('');
   const [doctor, setDoctor] = useState('');
   const [location, setLocation] = useState('');
   const [newDateVal, setNewDateVal] = useState('');
 
-  // Replace with dynamic Firebase Auth user UID or context variable
   const userId = "sample_firebase_user_id";
 
-  // ==========================================
-  // 1. FETCH INJECTIONS FROM API
-  // ==========================================
   useEffect(() => {
     fetchInjections();
   }, [userId]);
 
   const fetchInjections = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/injections/${userId}`);
+      const response = await fetch(`${API_BASE_URL}/api/injections/${userId}`);
       if (response.ok) {
         const data = await response.json();
         
-        // Map backend schema fields to frontend expectations
         const formatted = data.map(item => ({
           id: item._id,
           name: item.name,
@@ -48,9 +43,6 @@ export default function Injections() {
     }
   };
 
-  // ==========================================
-  // 2. ADD NEW INJECTION (POST API)
-  // ==========================================
   const handleAddInjection = async (e) => {
     e.preventDefault();
     if (!injName || !injDate) return;
@@ -67,7 +59,7 @@ export default function Injections() {
     };
 
     try {
-      const response = await fetch('http://localhost:5000/api/injections', {
+      const response = await fetch(`${API_BASE_URL}/api/injections`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -98,9 +90,6 @@ export default function Injections() {
     }
   };
 
-  // ==========================================
-  // 3. RESCHEDULE INJECTION
-  // ==========================================
   const handleSaveReschedule = (e) => {
     e.preventDefault();
     if (!newDateVal || !activeReschedule) return;
@@ -116,15 +105,12 @@ export default function Injections() {
     setNewDateVal('');
   };
 
-  // ==========================================
-  // 4. DELETE INJECTION (DELETE API)
-  // ==========================================
   const handleDelete = async (id, e) => {
     e.stopPropagation();
     if (!window.confirm('Are you sure you want to remove this vaccination record?')) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/injections/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/injections/${id}`, {
         method: 'DELETE'
       });
 
@@ -140,7 +126,6 @@ export default function Injections() {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-28 font-sans">
-      {/* Top Header & Add Action */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Injections</h1>
@@ -154,7 +139,6 @@ export default function Injections() {
         </button>
       </div>
 
-      {/* Injections List */}
       <div className="space-y-4">
         {injections.length === 0 ? (
           <div className="text-center py-12 bg-white border border-slate-100 rounded-3xl shadow-sm">
@@ -191,7 +175,6 @@ export default function Injections() {
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
                 <button 
                   onClick={() => setActiveDetails(inj)}
@@ -211,7 +194,6 @@ export default function Injections() {
         )}
       </div>
 
-      {/* Add Injection Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
@@ -293,7 +275,6 @@ export default function Injections() {
         </div>
       )}
 
-      {/* Details Modal */}
       {activeDetails && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
@@ -334,7 +315,6 @@ export default function Injections() {
         </div>
       )}
 
-      {/* Reschedule Modal */}
       {activeReschedule && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
