@@ -109,7 +109,7 @@ export default function Records() {
       category,
       date: 'Just now',
       doctor: location,
-      summary: fileDataUrl || (selectedFile ? `Attached File: ${selectedFile.name}` : 'Clinical Record Entry'),
+      summary: fileDataUrl ? `Attached File: ${selectedFile?.name || title}` : 'Clinical Record Entry',
       fileUrl: fileDataUrl
     };
 
@@ -130,7 +130,7 @@ export default function Records() {
           location: savedRecord.doctor,
           date: savedRecord.date,
           month: currentMonth,
-          fileUrl: fileDataUrl,
+          fileUrl: savedRecord.fileUrl || fileDataUrl,
           icon: selectedFile?.type?.includes('pdf') ? '📄' : '📁',
           recentlyUpdated: true
         };
@@ -141,9 +141,14 @@ export default function Records() {
         setSelectedFile(null);
         setFileDataUrl(null);
         setIsModalOpen(false);
+        alert('✅ Record uploaded and saved successfully!');
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        alert(`❌ Upload failed (${response.status}): ${errData.error || 'Unable to save record to server.'}`);
       }
     } catch (error) {
       console.error('Error saving record:', error);
+      alert('❌ Network error connecting to backend API.');
     }
   };
 
@@ -151,6 +156,8 @@ export default function Records() {
   // 3. DELETE RECORD FROM BACKEND (DELETE API)
   // ==========================================
   const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this clinical record?')) return;
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/records/${id}`, {
         method: 'DELETE'
@@ -159,6 +166,8 @@ export default function Records() {
       if (response.ok) {
         setRecords(records.filter(r => r.id !== id));
         setActiveMenuId(null);
+      } else {
+        alert('Failed to delete record from server.');
       }
     } catch (error) {
       console.error('Error deleting record:', error);
