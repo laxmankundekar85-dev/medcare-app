@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../config';
 
 export default function Profile({ onLogout }) {
-  // 1. Read saved photo from localStorage first (Instant load on tab switch)
+  const fileInputRef = useRef(null);
+
+  // Read saved photo from localStorage first (Instant load on mobile & desktop)
   const savedLocalAvatar = localStorage.getItem('userAvatar');
 
   const [profile, setProfile] = useState({
@@ -12,7 +14,7 @@ export default function Profile({ onLogout }) {
     age: '20',
     weight: '64',
     email: 'laxman.kundekar@healthmail.com',
-    phone: '+91 98765 43210',
+    phone: '+91 9503883879',
     address: 'VIVA Institute of Technology, Virar, Mumbai',
     avatar: savedLocalAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
   });
@@ -59,7 +61,6 @@ export default function Profile({ onLogout }) {
           weight: data.weight ? String(data.weight) : prev.weight,
           email: data.email || prev.email,
           phone: data.phone || prev.phone,
-          // Use DB avatar if present; otherwise keep localStorage or default
           avatar: data.avatar || localStorage.getItem('userAvatar') || prev.avatar
         }));
       }
@@ -76,7 +77,7 @@ export default function Profile({ onLogout }) {
   };
 
   // ==========================================
-  // 2. SAVE FIELD CHANGES (PUT API)
+  // 2. SAVE PROFILE FIELD CHANGES (PUT API)
   // ==========================================
   const handleSaveProfile = async (e) => {
     e.preventDefault();
@@ -110,51 +111,94 @@ export default function Profile({ onLogout }) {
   };
 
   // ==========================================
-  // 3. PERSIST PHOTO TO BOTH LOCALSTORAGE & API
+  // 3. MOBILE-OPTIMIZED IMAGE UPLOAD & COMPRESSION
   // ==========================================
   const handleImageUpload = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files && e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64Image = reader.result;
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = async () => {
+        // Resize and compress high-res mobile photos to 300x300
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 300;
+        const MAX_HEIGHT = 300;
+        let width = img.width;
+        let height = img.height;
 
-      // A. Save immediately to LocalStorage so tab switches won't lose it
-      localStorage.setItem('userAvatar', base64Image);
-
-      // B. Update local UI state
-      setProfile(prev => ({ ...prev, avatar: base64Image }));
-
-      // C. Send to MongoDB Backend
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fullName: profile.name,
-            patientId: profile.patientId,
-            bloodGroup: profile.bloodGroup,
-            weight: Number(profile.weight) || 64,
-            email: profile.email,
-            phone: profile.phone,
-            avatar: base64Image
-          })
-        });
-
-        if (response.ok) {
-          alert('✅ Profile photo saved!');
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
         }
-      } catch (error) {
-        console.error('Error saving profile photo to server:', error);
-      }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convert to optimized WebP / JPEG Base64 data
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+        // A. Save immediately to LocalStorage
+        try {
+          localStorage.setItem('userAvatar', compressedBase64);
+        } catch (err) {
+          console.warn('LocalStorage quota exceeded', err);
+        }
+
+        // B. Update React State
+        setProfile(prev => ({ ...prev, avatar: compressedBase64 }));
+
+        // C. Send to MongoDB API
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fullName: profile.name,
+              patientId: profile.patientId,
+              bloodGroup: profile.bloodGroup,
+              weight: Number(profile.weight) || 64,
+              email: profile.email,
+              phone: profile.phone,
+              avatar: compressedBase64
+            })
+          });
+
+          if (response.ok) {
+            alert('✅ Profile photo updated!');
+          }
+        } catch (error) {
+          console.error('Error saving profile photo to server:', error);
+        }
+      };
+      img.src = event.target.result;
     };
 
     reader.readAsDataURL(file);
+    e.target.value = null; // Clear input target for repeated uploads
   };
 
   return (
     <div className="p-6 max-w-4xl mx-auto pb-32 font-sans">
+      {/* Hidden Native Input */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        accept="image/*" 
+        onChange={handleImageUpload} 
+        className="hidden" 
+      />
+
       <div className="flex justify-between items-center mb-6">
         <button type="button" onClick={() => alert('Navigating back')} className="text-gray-700 font-bold text-lg cursor-pointer">
           ←
@@ -176,7 +220,11 @@ export default function Profile({ onLogout }) {
         </div>
         
         <div className="absolute -bottom-10 left-1/2 transform -translate-x-1/2 flex flex-col items-center">
-          <label className="relative group cursor-pointer">
+          {/* Mobile-friendly click target */}
+          <div 
+            onClick={() => fileInputRef.current && fileInputRef.current.click()}
+            className="relative group cursor-pointer"
+          >
             <div className="w-24 h-24 rounded-full border-4 border-white shadow-md overflow-hidden bg-gray-200">
               <img 
                 src={profile.avatar} 
@@ -185,17 +233,10 @@ export default function Profile({ onLogout }) {
               />
             </div>
             
-            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white text-[11px] font-semibold text-center px-1">
+            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center transition text-white text-[11px] font-semibold text-center px-1">
               📷 Change Photo
             </div>
-
-            <input 
-              type="file" 
-              accept="image/*" 
-              onChange={handleImageUpload} 
-              className="hidden" 
-            />
-          </label>
+          </div>
           <span className="absolute bottom-0 right-0 bg-teal-700 text-white p-1 rounded-full text-xs shadow pointer-events-none">
             ✓
           </span>
