@@ -145,7 +145,7 @@ export default function Profile({ onLogout }) {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Convert to optimized WebP / JPEG Base64 data
+        // Convert to optimized JPEG Base64 data
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
 
         // A. Save immediately to LocalStorage
@@ -229,11 +229,12 @@ export default function Profile({ onLogout }) {
               <img 
                 src={profile.avatar} 
                 alt="Profile Avatar" 
-                className="w-full h-full object-cover group-hover:opacity-90 transition"
+                className="w-full h-full object-cover"
               />
             </div>
             
-            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center transition text-white text-[11px] font-semibold text-center px-1">
+            {/* HIDDEN BY DEFAULT (opacity-0). Shows on hover (desktop) or active touch (mobile) */}
+            <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-200 text-white text-[10px] font-semibold text-center px-1">
               📷 Change Photo
             </div>
           </div>
