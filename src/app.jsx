@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Menu, Bell, X, Home, Calendar, BriefcaseMedical, FileText, 
   User, Settings as SettingsIcon, Pill, Syringe, 
-  Activity, FileClock
+  Activity, FileClock, Bot, Sparkles
 } from 'lucide-react';
 
 // Import Layout Components
@@ -19,6 +19,7 @@ import Settings from './pages/Settings';
 import Appointments from './pages/Appointments';
 import Alarms from './pages/Alarms';
 import PreviousDiseases from './pages/PreviousDiseases';
+import Chatbot from './pages/Chatbot';
 
 import { API_BASE_URL } from './config';
 
@@ -238,6 +239,7 @@ export default function MedcareApp() {
 
             <nav className="flex-1 overflow-y-auto py-4 px-4 space-y-2">
               <SidebarItem icon={<Home size={20}/>} label="Dashboard" onClick={() => navigateTo('dashboard')} active={currentView === 'dashboard'} />
+              <SidebarItem icon={<Bot size={20}/>} label="AI Assistant" onClick={() => navigateTo('chatbot')} active={currentView === 'chatbot'} />
               <SidebarItem icon={<Pill size={20}/>} label="Medications" onClick={() => navigateTo('medications')} active={currentView === 'medications'} />
               <SidebarItem icon={<Syringe size={20}/>} label="Injections" onClick={() => navigateTo('injections')} active={currentView === 'injections'} />
               <SidebarItem icon={<Activity size={20}/>} label="Previous Diseases" onClick={() => navigateTo('diseases')} active={currentView === 'diseases'} />
@@ -267,6 +269,7 @@ export default function MedcareApp() {
       {/* Main Content Area */}
       <main className="p-4">
         {currentView === 'dashboard' && <Dashboard />}
+        {currentView === 'chatbot' && <Chatbot />}
         {currentView === 'appointments' && <Appointments />}
         {currentView === 'alarms' && <Alarms />}
         {currentView === 'medications' && <Medications />}
@@ -276,6 +279,19 @@ export default function MedcareApp() {
         {currentView === 'profile' && <Profile onLogout={handleLogout} />}
         {currentView === 'settings' && <Settings onLogout={handleLogout} />}
       </main>
+
+      {/* Floating AI Assistant Action Button (FAB) */}
+      {currentView !== 'chatbot' && (
+        <button
+          type="button"
+          onClick={() => navigateTo('chatbot')}
+          className="fixed bottom-24 right-5 bg-teal-800 hover:bg-teal-900 text-white p-4 rounded-full shadow-2xl z-40 transition-transform transform hover:scale-105 flex items-center justify-center gap-2 cursor-pointer border-2 border-white"
+          title="Open AI Health Assistant"
+        >
+          <Bot size={24} />
+          <Sparkles size={14} className="text-amber-300 fill-amber-300 absolute -top-1 -right-1" />
+        </button>
+      )}
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 w-full bg-slate-50 border-t border-slate-200 flex justify-around p-3 z-10 pb-6">
