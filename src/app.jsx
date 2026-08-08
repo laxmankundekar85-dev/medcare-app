@@ -27,18 +27,29 @@ export default function MedcareApp() {
   // Reference for notification container to handle clicking outside
   const notificationRef = useRef(null);
 
+  // Helper to read current logged-in user ID
+  const getCurrentUserId = () => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('user'));
+      return stored?.uid || stored?.email || 'guest_user';
+    } catch {
+      return 'guest_user';
+    }
+  };
+
   // Dynamic User State from localStorage
   const [user, setUser] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('user')) || { displayName: 'Laxman' };
+      return JSON.parse(localStorage.getItem('user')) || null;
     } catch {
-      return { displayName: 'Laxman' };
+      return null;
     }
   });
 
-  // Avatar State read from localStorage
+  // Avatar State scoped per user ID
   const [userAvatar, setUserAvatar] = useState(() => {
-    return localStorage.getItem('userAvatar') || null;
+    const uid = getCurrentUserId();
+    return localStorage.getItem(`userAvatar_${uid}`) || localStorage.getItem('userAvatar') || null;
   });
 
   // Update user state whenever currentView changes (e.g., after logging in)
@@ -47,10 +58,11 @@ export default function MedcareApp() {
       const storedUser = JSON.parse(localStorage.getItem('user'));
       if (storedUser) {
         setUser(storedUser);
-      }
-      const storedAvatar = localStorage.getItem('userAvatar');
-      if (storedAvatar) {
-        setUserAvatar(storedAvatar);
+        const uid = storedUser.uid || storedUser.email || 'guest_user';
+        const avatar = localStorage.getItem(`userAvatar_${uid}`) || localStorage.getItem('userAvatar');
+        if (avatar) setUserAvatar(avatar);
+      } else {
+        setUser(null);
       }
     } catch (e) {
       console.error('Error reading user data from localStorage', e);
@@ -100,9 +112,25 @@ export default function MedcareApp() {
     setShowNotifications(false);
   };
 
+  // Completely purge session and account cache on logout
   const handleLogout = () => {
     localStorage.removeItem('user');
-    setUser({ displayName: 'Laxman' });
+    Object.keys(localStorage).forEach(key => {
+      if (
+        key.startsWith('cached_') || 
+        key.startsWith('user_') || 
+        key.startsWith('userAvatar') || 
+        key.startsWith('userWeight') || 
+        key.startsWith('userHeight') || 
+        key.startsWith('patientName') || 
+        key.startsWith('patientId')
+      ) {
+        localStorage.removeItem(key);
+      }
+    });
+
+    setUser(null);
+    setUserAvatar(null);
     navigateTo('login');
   };
 
@@ -110,7 +138,8 @@ export default function MedcareApp() {
     return <Login onLogin={() => navigateTo('dashboard')} />;
   }
 
-  const userDisplayName = user.displayName || 'Laxman';
+  const userDisplayName = user?.displayName || 'Patient';
+  const userPatientId = user?.patientId || '#MC8829';
   const defaultAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userDisplayName)}`;
 
   return (
@@ -185,7 +214,7 @@ export default function MedcareApp() {
               </div>
               <div>
                 <h2 className="font-bold text-lg">{userDisplayName}</h2>
-                <p className="text-sm text-slate-500">Patient ID: #MC8829</p>
+                <p className="text-sm text-slate-500">Patient ID: {userPatientId}</p>
               </div>
             </div>
 
