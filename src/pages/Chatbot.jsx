@@ -29,7 +29,7 @@ export default function Chatbot() {
       return JSON.parse(localStorage.getItem(getCacheKey('chat_history'))) || [
         {
           sender: 'bot',
-          text: `Hello ${profile.name || 'there'}! 👋 I am your Medcare Personal AI Assistant. How can I help you with your health schedule, medications, or records today?`
+          text: `Hello ${profile.fullName || profile.name || 'there'}! 👋 I am your Medcare Personal AI Assistant. How can I help you with your health schedule, medications, or records today?`
         }
       ];
     } catch {
@@ -45,7 +45,7 @@ export default function Chatbot() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom on new messages
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     localStorage.setItem(getCacheKey('chat_history'), JSON.stringify(messages));
@@ -62,7 +62,7 @@ export default function Chatbot() {
 
     try {
       const contextPayload = {
-        userName: profile.name || 'Patient',
+        userName: profile.fullName || profile.name || 'Patient',
         patientId: profile.patientId || '#MC8829',
         bloodGroup: profile.bloodGroup || 'Not specified',
         weight: profile.weight || 'Not specified',
@@ -79,20 +79,22 @@ export default function Chatbot() {
         })
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok && data.reply) {
         setMessages(prev => [...prev, { sender: 'bot', text: data.reply }]);
       } else {
+        const errorDetail = data.error || `Server error (Status: ${response.status})`;
         setMessages(prev => [
           ...prev,
-          { sender: 'bot', text: "I'm having trouble reaching the medical AI server right now. Please ensure your Express backend is running." }
+          { sender: 'bot', text: `⚠️ ${errorDetail}` }
         ]);
       }
     } catch (error) {
       console.error('Chatbot API Error:', error);
       setMessages(prev => [
         ...prev,
-        { sender: 'bot', text: 'Network connection issue. Please check if your backend API server is online.' }
+        { sender: 'bot', text: `⚠️ Unable to connect to backend server at ${API_BASE_URL}. Please verify node server.js is active.` }
       ]);
     } finally {
       setLoading(false);
@@ -103,7 +105,7 @@ export default function Chatbot() {
     const defaultMsg = [
       {
         sender: 'bot',
-        text: `Chat history cleared. How can I help you today, ${profile.name || 'Patient'}?`
+        text: `Chat history cleared. How can I help you today, ${profile.fullName || profile.name || 'Patient'}?`
       }
     ];
     setMessages(defaultMsg);
@@ -142,7 +144,7 @@ export default function Chatbot() {
         </button>
       </div>
 
-      {/* Messages */}
+      {/* Messages Window */}
       <div className="flex-1 bg-white border border-slate-200 rounded-3xl p-4 overflow-y-auto space-y-4 shadow-sm">
         {messages.map((msg, index) => (
           <div 
@@ -178,7 +180,7 @@ export default function Chatbot() {
         <div ref={chatEndRef} />
       </div>
 
-      {/* Suggested Prompts */}
+      {/* Suggested Quick Prompts */}
       <div className="flex gap-2 overflow-x-auto py-3 no-scrollbar">
         {quickPrompts.map((prompt, idx) => (
           <button
@@ -191,7 +193,7 @@ export default function Chatbot() {
         ))}
       </div>
 
-      {/* Form Input */}
+      {/* Input Form */}
       <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="relative flex items-center">
         <input 
           type="text" 

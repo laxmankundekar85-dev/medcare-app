@@ -26,7 +26,7 @@ const require = createRequire(import.meta.url);
 const app = express();
 
 // ==========================================
-// 1. MIDDLEWARE (Updated with 50mb limit for large PDF/image uploads)
+// 1. MIDDLEWARE (50mb limit for PDF/image uploads)
 // ==========================================
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -61,7 +61,6 @@ if (process.env.FIREBASE_PRIVATE_KEY) {
   };
 } else {
   try {
-    // Safely attempt local fallback without crashing on cloud deployments
     serviceAccount = require('./serviceAccountKey.json');
   } catch (err) {
     console.warn('⚠️ serviceAccountKey.json not found locally. Relying on environment variables.');
@@ -87,13 +86,13 @@ if (serviceAccount) {
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 465,
-  secure: true, // Use SSL
+  secure: true,
   auth: {
     user: process.env.EMAIL_USER || 'laxmankundekar85@gmail.com',
     pass: process.env.EMAIL_PASS
   },
   tls: {
-    rejectUnauthorized: false // Prevents local SSL certificate blocking
+    rejectUnauthorized: false
   }
 });
 
@@ -125,7 +124,171 @@ app.use('/api/records', recordRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/previous-diseases', previousDiseaseRoutes);
 
-// Fallback Route: Direct PATCH handler for medication status toggle if needed
+// ==========================================
+// 7. ROUTE: PERSONALIZED AI HEALTH CHATBOT
+// ==========================================
+app.post('/api/chat', async (req, res) => {
+  console.log('📩 Chat endpoint hit on port 5000!');
+  try {
+    const { userId, message, userContext } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: 'Message content is required.' });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    // Default context from payload
+    let patientName = userContext?.userName || 'Laxman';
+    let patientId = userContext?.patientId || 'N/A';
+    let bloodGroup = userContext?.bloodGroup || 'N/A';
+    let weight = userContext?.weight || 'N/A';
+    let activeMeds = userContext?.activeMedications || 'None logged';
+
+    // Query MongoDB directly if DB is connected and userId is passed
+    const db = mongoose.connection.db;
+    if (db && userId && userId !== 'guest_user') {
+      try {
+        const profileDoc = await db.collection('profiles').findOne({ userId });
+        if (profileDoc) {
+          patientName = profileDoc.fullName || profileDoc.name || patientName;
+          patientId = profileDoc.patientId || patientId;
+          bloodGroup = profileDoc.bloodGroup || bloodGroup;
+          weight = profileDoc.weight ? String(profileDoc.weight) : weight;
+        }
+
+        const medDocs = await db.collection('medications').find({ userId, status: { $ne: 'Inactive' } }).toArray();
+        if (medDocs && medDocs.length > 0) {
+          activeMeds = medDocs.map(m => `${m.name} (${m.dosage || 'standard dose'})`).join(', ');
+        }
+      } catch (dbErr) {
+        console.warn('Could not fetch DB records for context:', dbErr.message);
+      }
+    }
+
+    const systemPrompt = `
+      You are Medcare AI, an advanced, polite, and empathetic medical assistant inside the Medcare web application.
+
+      PATIENT CONTEXT:
+      - Name: ${patientName}
+      - Patient ID: ${patientId}
+      - Blood Group: ${bloodGroup}
+      - Weight: ${weight} kg
+      - Active Medications: ${activeMeds}
+
+      INSTRUCTIONS:
+      1. Address the patient warmly by name (${patientName}).
+      2. Respond directly, specifically, and intelligently to any health condition, medical query, emergency situation, or symptom requested.
+      3. For critical emergencies (like snake bite, chest pain, heavy bleeding), urge immediate emergency hospitalization and provide crucial immediate first-aid steps.
+      4. Format your response cleanly using bullet points or bold text.
+      5. Always include a brief disclaimer: "Note: I am an AI assistant. Please consult a qualified doctor for clinical diagnoses."
+    `;
+
+    const fullPrompt = `${systemPrompt}\n\nPatient Query: ${message}`;
+    let replyText = '';
+
+    // Attempt Gemini REST API call
+    if (apiKey) {
+      const apiEndpoints = [
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+      ];
+
+      for (const url of apiEndpoints) {
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: fullPrompt }] }]
+            })
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            replyText = data.candidates[0].content.parts[0].text;
+            console.log(`✅ AI Response generated successfully via Gemini API!`);
+            break;
+          }
+        } catch (err) {
+          console.warn(`Fetch error:`, err.message);
+        }
+      }
+    }
+
+    // Comprehensive Local Health Engine (Expanded First Aid & Emergency Rules)
+    if (!replyText) {
+      console.log('💡 Processing query via Local Health Assistant Engine...');
+      const lowerMsg = message.toLowerCase();
+
+      // Emergency: Snake Bite
+      if (lowerMsg.includes('snake') || lowerMsg.includes('bite') || lowerMsg.includes('venom') || lowerMsg.includes('serpent')) {
+        replyText = `🚨 **EMERGENCY FIRST AID FOR SNAKE BITE** 🚨\n\nHello ${patientName}! Please stay calm and take these steps **IMMEDIATELY**:\n\n1. 🚑 **CALL EMERGENCY SERVICES (108 / 911) NOW** or get to the nearest emergency medical room immediately.\n2. **Keep Calm & Still:** Movement causes venom to spread faster through the bloodstream.\n3. **Immobilize the Area:** Keep the bitten limb at or slightly below heart level.\n4. **Remove Tight Items:** Take off rings, watches, or tight clothing near the bite in case of swelling.\n5. ❌ **DO NOT:** Cut the wound, suck out venom, apply ice, or tie a tight tourniquet.\n\n*Note: Anti-venom at a hospital is the only effective treatment for venomous snake bites. Get to an ER right away!*`;
+
+      // Emergency: Chest Pain / Heart
+      } else if (lowerMsg.includes('chest pain') || lowerMsg.includes('heart attack') || lowerMsg.includes('shortness of breath')) {
+        replyText = `🚨 **CRITICAL MEDICAL EMERGENCY** 🚨\n\nHello ${patientName}! Chest pain can be a sign of a cardiac event. Please seek emergency medical care immediately:\n\n1. 🚑 **Call 108 / emergency services right away.**\n2. Sit down and rest in a comfortable position.\n3. Do not attempt to drive yourself to the hospital.\n\n*Note: Seek urgent clinical care immediately.*`;
+
+      // Emergency: Burns / Cuts / Bleeding
+      } else if (lowerMsg.includes('burn') || lowerMsg.includes('bleed') || lowerMsg.includes('cut') || lowerMsg.includes('wound')) {
+        replyText = `Hello ${patientName}! For cuts or burns first-aid:\n\n1. **Bleeding:** Apply firm, continuous pressure with a clean cloth.\n2. **Burns:** Run cool (not ice-cold) tap water over the burn for 10-15 minutes.\n3. **Cleanliness:** Wash mild wounds gently with clean water.\n\n⚠️ Seek doctor evaluation for deep wounds, heavy bleeding, or severe burns.`;
+
+      // Headache / Head Pain
+      } else if (lowerMsg.includes('head') || lowerMsg.includes('headache') || lowerMsg.includes('head pain')) {
+        replyText = `Hello ${patientName}! I am sorry to hear that your head is paining. 🤕\n\n**Immediate Relief Steps:**\n1. Rest in a dark, quiet, well-ventilated room.\n2. Hydrate with water, as dehydration is a primary trigger.\n3. Apply a cold or warm compress across your forehead.\n\n💊 **Active Logged Meds:** ${activeMeds}\n\n*Note: Please consult a physician before taking any unprescribed pain relief.*`;
+
+      // Fever
+      } else if (lowerMsg.includes('fever') || lowerMsg.includes('temperature') || lowerMsg.includes('chills')) {
+        replyText = `Hello ${patientName}! For fever management:\n\n1. Rest comfortably and drink fluids (water, ORS).\n2. Apply a damp cloth to your forehead or neck.\n3. Monitor your temperature periodically.\n\n*Note: Consult a doctor if fever stays high.*`;
+
+      // Stomach / Nausea
+      } else if (lowerMsg.includes('stomach') || lowerMsg.includes('nausea') || lowerMsg.includes('vomit') || lowerMsg.includes('cramp')) {
+        replyText = `Hello ${patientName}! For stomach discomfort:\n\n1. Sip small amounts of clear fluids or ginger tea.\n2. Avoid spicy or greasy foods.\n3. Rest in an upright position.\n\n*Note: Consult a doctor if severe pain persists.*`;
+
+      // General Unwell
+      } else if (lowerMsg.includes('not feeling well') || lowerMsg.includes('sick') || lowerMsg.includes('unwell') || lowerMsg.includes('pain') || lowerMsg.includes('dizzy')) {
+        replyText = `Hello ${patientName}! I am sorry to hear that you are not feeling well. 💙\n\nNext steps:\n1. Rest and sip water regularly.\n2. Verify your active medications: **${activeMeds}**.\n3. Track any new symptoms.\n\n*Note: Consult a doctor for clinical diagnosis.*`;
+
+      // Medications
+      } else if (lowerMsg.includes('medication') || lowerMsg.includes('medicine') || lowerMsg.includes('taking') || lowerMsg.includes('dose') || lowerMsg.includes('pill')) {
+        replyText = `Hello ${patientName}! 👋\n\nYour active Medcare medications:\n💊 **${activeMeds}**\n\nPlease follow your doctor's dosage schedule!`;
+
+      // Blood Pressure
+      } else if (lowerMsg.includes('blood pressure') || lowerMsg.includes('bp') || lowerMsg.includes('hypertension')) {
+        replyText = `Hello ${patientName}! Core tips for healthy blood pressure:\n1. Reduce sodium intake.\n2. Engage in 30 mins of daily moderate exercise.\n3. Manage stress and stay hydrated.`;
+
+      // Doctor Visit
+      } else if (lowerMsg.includes('doctor') || lowerMsg.includes('visit') || lowerMsg.includes('prepare') || lowerMsg.includes('appointment')) {
+        replyText = `Hello ${patientName}! To prepare for your visit:\n1. Note down symptoms and questions.\n2. Share your medication list (${activeMeds}).\n3. Bring previous lab reports.`;
+
+      // Hydration
+      } else if (lowerMsg.includes('hydration') || lowerMsg.includes('water') || lowerMsg.includes('fluid') || lowerMsg.includes('drink')) {
+        replyText = `Hello ${patientName}! Aim for 2.5 to 3 Liters of water daily for optimal health. 💧`;
+
+      // Greetings
+      } else if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('hey')) {
+        replyText = `Hello ${patientName}! 👋 Welcome to Medcare Assistant. How can I assist you with your health today?`;
+
+      // Fallback
+      } else {
+        replyText = `Hello ${patientName}! I am your Medcare AI Assistant.\n\nI can help you with:\n- First-aid guidance for symptoms & injuries\n- Information on your active medications (${activeMeds})\n- Preparing for doctor visits\n\nHow can I help you regarding your health right now?`;
+      }
+    }
+
+    res.json({ success: true, reply: replyText });
+
+  } catch (error) {
+    console.error('❌ Gemini AI Chat Route Error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to generate AI response.' });
+  }
+});
+
+// Fallback Route: Direct PATCH handler for medication status toggle
 app.patch('/api/medications/:id/toggle', async (req, res) => {
   try {
     const { id } = req.params;
@@ -138,16 +301,13 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
 
     const collection = db.collection('medications');
 
-    // Find current document
     const medication = await collection.findOne({ _id: new mongoose.Types.ObjectId(id) });
     if (!medication) {
       return res.status(404).json({ error: "Medication document not found." });
     }
 
-    // Determine target status
     const targetStatus = status || (medication.status === 'Taken' ? 'Active' : 'Taken');
 
-    // Update document in MongoDB
     await collection.updateOne(
       { _id: new mongoose.Types.ObjectId(id) },
       { 
@@ -167,7 +327,7 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
 });
 
 // ==========================================
-// 7. ROUTE: SEND OTP
+// 8. ROUTE: SEND OTP
 // ==========================================
 app.post('/api/auth/send-otp', async (req, res) => {
   const { email } = req.body;
@@ -220,7 +380,7 @@ app.post('/api/auth/send-otp', async (req, res) => {
 });
 
 // ==========================================
-// 8. ROUTE: VERIFY OTP & RESET PASSWORD
+// 9. ROUTE: VERIFY OTP & RESET PASSWORD
 // ==========================================
 app.post('/api/auth/verify-otp-reset', async (req, res) => {
   const { email, otp, newPassword } = req.body;
@@ -260,7 +420,7 @@ app.post('/api/auth/verify-otp-reset', async (req, res) => {
 });
 
 // ==========================================
-// 9. START SERVER
+// 10. START SERVER
 // ==========================================
 const PORT = process.env.PORT || 5000;
 
