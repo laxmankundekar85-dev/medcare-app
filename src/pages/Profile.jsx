@@ -6,52 +6,83 @@ export default function Profile({ onLogout }) {
   const fileInputRef = useRef(null);
   const userId = getUserId();
 
-  const savedLocalAvatar = localStorage.getItem(getCacheKey('userAvatar'));
+  const getStoredAvatar = () => {
+    return localStorage.getItem(getCacheKey('userAvatar')) || localStorage.getItem(`userAvatar_${userId}`);
+  };
 
-  // Read immediately from LocalStorage cache for instant rendering (User Scoped)
   const [profile, setProfile] = useState(() => {
     try {
       const cached = JSON.parse(localStorage.getItem(getCacheKey('user_profile_cache')));
       if (cached) return cached;
     } catch {
-      // Fallback if no JSON cache exists
+      // Fallback
     }
     return {
-      name: 'Patient Name',
-      patientId: '#MC-98442',
-      bloodGroup: 'O+',
+      name: 'Laxman',
+      patientId: '#MC8829',
+      bloodGroup: 'B+',
       age: '20',
-      weight: '64',
-      email: 'patient@healthmail.com',
+      weight: '60',
+      email: 'laxman.kundekar@healthmail.com',
       phone: '+91 9503883879',
       address: 'Mumbai, India',
-      avatar: savedLocalAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
+      avatar: getStoredAvatar() || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
     };
   });
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [activeSubView, setActiveSubView] = useState(null);
+  const [activeSubView, setActiveSubView] = useState(null); // 'checkup', 'vaccination', 'privacy', 'notifications'
 
   const [editField, setEditField] = useState('');
   const [editVal, setEditVal] = useState('');
   const [modalTitle, setModalTitle] = useState('');
 
-  const [notifSettings, setNotifSettings] = useState({
-    push: true,
-    sms: true,
-    emailAlerts: false,
-    reminders: true
+  // Comprehensive Notification Settings
+  const [notifSettings, setNotifSettings] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(getCacheKey('notif_settings'))) || {
+        medication: true,
+        appointments: true,
+        vaccinations: true,
+        emergencyAlerts: true,
+        emailSummaries: false,
+        push: true,
+        sms: true
+      };
+    } catch {
+      return {
+        medication: true,
+        appointments: true,
+        vaccinations: true,
+        emergencyAlerts: true,
+        emailSummaries: false,
+        push: true,
+        sms: true
+      };
+    }
   });
 
-  const [privacySettings, setPrivacySettings] = useState({
-    biometric: true,
-    shareData: false,
-    twoFactor: true
+  // Advanced Privacy & Security Settings
+  const [privacySettings, setPrivacySettings] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(getCacheKey('privacy_settings'))) || {
+        biometric: true,
+        twoFactor: true,
+        hipaaSharing: false,
+        hideVitalsOnLock: true,
+        autoLogoutMinutes: '15'
+      };
+    } catch {
+      return {
+        biometric: true,
+        twoFactor: true,
+        hipaaSharing: false,
+        hideVitalsOnLock: true,
+        autoLogoutMinutes: '15'
+      };
+    }
   });
 
-  // ==========================================
-  // 1. FETCH PROFILE & AVATAR FROM BACKEND API
-  // ==========================================
   useEffect(() => {
     if (!userId || userId === 'guest_user') return;
     fetchProfile();
@@ -63,14 +94,11 @@ export default function Profile({ onLogout }) {
       if (response.ok) {
         const data = await response.json();
         setProfile(prev => {
-          const updatedAvatar = data.avatar || localStorage.getItem(getCacheKey('userAvatar')) || prev.avatar;
+          const freshAvatar = data.avatar || getStoredAvatar() || prev.avatar;
           
           if (data.avatar) {
-            try {
-              localStorage.setItem(getCacheKey('userAvatar'), data.avatar);
-            } catch (e) {
-              console.warn('Quota exceeded saving avatar to cache', e);
-            }
+            localStorage.setItem(getCacheKey('userAvatar'), data.avatar);
+            localStorage.setItem(`userAvatar_${userId}`, data.avatar);
           }
 
           const updated = {
@@ -81,9 +109,9 @@ export default function Profile({ onLogout }) {
             weight: data.weight ? String(data.weight) : prev.weight,
             email: data.email || prev.email,
             phone: data.phone || prev.phone,
-            avatar: updatedAvatar
+            avatar: freshAvatar
           };
-          
+
           localStorage.setItem(getCacheKey('user_profile_cache'), JSON.stringify(updated));
           return updated;
         });
@@ -93,6 +121,16 @@ export default function Profile({ onLogout }) {
     }
   };
 
+  const saveNotifSettings = (newSettings) => {
+    setNotifSettings(newSettings);
+    localStorage.setItem(getCacheKey('notif_settings'), JSON.stringify(newSettings));
+  };
+
+  const savePrivacySettings = (newSettings) => {
+    setPrivacySettings(newSettings);
+    localStorage.setItem(getCacheKey('privacy_settings'), JSON.stringify(newSettings));
+  };
+
   const openEditModal = (fieldKey, title) => {
     setEditField(fieldKey);
     setEditVal(profile[fieldKey]);
@@ -100,15 +138,11 @@ export default function Profile({ onLogout }) {
     setIsEditModalOpen(true);
   };
 
-  // ==========================================
-  // 2. SAVE PROFILE FIELD CHANGES (PUT API)
-  // ==========================================
   const handleSaveProfile = async (e) => {
     e.preventDefault();
 
     const updatedProfile = { ...profile, [editField]: editVal };
 
-    // Instant local save
     setProfile(updatedProfile);
     localStorage.setItem(getCacheKey('user_profile_cache'), JSON.stringify(updatedProfile));
     setIsEditModalOpen(false);
@@ -117,7 +151,7 @@ export default function Profile({ onLogout }) {
       fullName: updatedProfile.name,
       patientId: updatedProfile.patientId,
       bloodGroup: updatedProfile.bloodGroup,
-      weight: Number(updatedProfile.weight) || 64,
+      weight: Number(updatedProfile.weight) || 60,
       email: updatedProfile.email,
       phone: updatedProfile.phone,
       avatar: updatedProfile.avatar
@@ -134,9 +168,6 @@ export default function Profile({ onLogout }) {
     }
   };
 
-  // ==========================================
-  // 3. MOBILE-OPTIMIZED IMAGE UPLOAD & COMPRESSION
-  // ==========================================
   const handleImageUpload = (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -172,6 +203,7 @@ export default function Profile({ onLogout }) {
 
         try {
           localStorage.setItem(getCacheKey('userAvatar'), compressedBase64);
+          localStorage.setItem(`userAvatar_${userId}`, compressedBase64);
         } catch (err) {
           console.warn('LocalStorage quota exceeded', err);
         }
@@ -190,7 +222,7 @@ export default function Profile({ onLogout }) {
               fullName: profile.name,
               patientId: profile.patientId,
               bloodGroup: profile.bloodGroup,
-              weight: Number(profile.weight) || 64,
+              weight: Number(profile.weight) || 60,
               email: profile.email,
               phone: profile.phone,
               avatar: compressedBase64
@@ -213,7 +245,6 @@ export default function Profile({ onLogout }) {
 
   return (
     <div className="p-6 max-w-4xl mx-auto pb-32 font-sans">
-      {/* Hidden Native Input */}
       <input 
         type="file" 
         ref={fileInputRef} 
@@ -222,7 +253,6 @@ export default function Profile({ onLogout }) {
         className="hidden" 
       />
 
-      {/* Clean Centered Title Header */}
       <div className="mb-6 text-center">
         <h1 className="text-xl font-bold text-gray-900">Profile</h1>
       </div>
@@ -335,7 +365,7 @@ export default function Profile({ onLogout }) {
         <h3 className="text-xs font-bold text-gray-400 tracking-wider mb-3">MEDICAL SUMMARY</h3>
         <div className="space-y-3">
           <div 
-            onClick={() => setActiveSubView('medical')}
+            onClick={() => setActiveSubView('checkup')}
             className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm flex justify-between items-center cursor-pointer hover:border-teal-300 transition"
           >
             <div className="flex items-center gap-3">
@@ -349,7 +379,7 @@ export default function Profile({ onLogout }) {
           </div>
 
           <div 
-            onClick={() => setActiveSubView('medical')}
+            onClick={() => setActiveSubView('vaccination')}
             className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm flex justify-between items-center cursor-pointer hover:border-teal-300 transition"
           >
             <div className="flex items-center gap-3">
@@ -371,7 +401,10 @@ export default function Profile({ onLogout }) {
         >
           <div className="flex items-center gap-3">
             <span className="text-gray-600 text-lg">🛡️</span>
-            <span className="font-medium text-gray-900 text-sm">Privacy & Security</span>
+            <div>
+              <h4 className="font-bold text-gray-900 text-sm">Privacy & Security</h4>
+              <p className="text-xs text-gray-400">Biometrics, 2FA, auto-lock & HIPAA sharing</p>
+            </div>
           </div>
           <span className="text-gray-400 font-bold">›</span>
         </div>
@@ -382,7 +415,10 @@ export default function Profile({ onLogout }) {
         >
           <div className="flex items-center gap-3">
             <span className="text-gray-600 text-lg">🔔</span>
-            <span className="font-medium text-gray-900 text-sm">Notification Settings</span>
+            <div>
+              <h4 className="font-bold text-gray-900 text-sm">Notification Settings</h4>
+              <p className="text-xs text-gray-400">Medication, doses, doctor alerts & sound</p>
+            </div>
           </div>
           <span className="text-gray-400 font-bold">›</span>
         </div>
@@ -396,6 +432,7 @@ export default function Profile({ onLogout }) {
         </button>
       </div>
 
+      {/* Field Edit Modal */}
       {isEditModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
@@ -442,86 +479,30 @@ export default function Profile({ onLogout }) {
         </div>
       )}
 
-      {activeSubView === 'notifications' && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-900">Notification Settings</h3>
-              <button type="button" onClick={() => setActiveSubView(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer">&times;</button>
-            </div>
-            
-            <div className="space-y-4 mb-6">
-              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl">
-                <div>
-                  <h4 className="font-bold text-sm text-gray-900">Push Notifications</h4>
-                  <p className="text-xs text-gray-500">Receive instant alerts for doses</p>
-                </div>
-                <button 
-                  type="button"
-                  onClick={() => setNotifSettings({...notifSettings, push: !notifSettings.push})}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${notifSettings.push ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
-                >
-                  <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
-                </button>
-              </div>
-
-              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl">
-                <div>
-                  <h4 className="font-bold text-sm text-gray-900">SMS Alerts</h4>
-                  <p className="text-xs text-gray-500">Get text messages for appointments</p>
-                </div>
-                <button 
-                  type="button"
-                  onClick={() => setNotifSettings({...notifSettings, sms: !notifSettings.sms})}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${notifSettings.sms ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
-                >
-                  <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
-                </button>
-              </div>
-
-              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl">
-                <div>
-                  <h4 className="font-bold text-sm text-gray-900">Email Summaries</h4>
-                  <p className="text-xs text-gray-500">Weekly health report updates</p>
-                </div>
-                <button 
-                  type="button"
-                  onClick={() => setNotifSettings({...notifSettings, emailAlerts: !notifSettings.emailAlerts})}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${notifSettings.emailAlerts ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
-                >
-                  <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setActiveSubView(null)}
-              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow text-sm cursor-pointer"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
-
+      {/* Advanced Privacy & Security Modal */}
       {activeSubView === 'privacy' && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
               <h3 className="text-xl font-bold text-gray-900">Privacy & Security</h3>
-              <button type="button" onClick={() => setActiveSubView(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer">&times;</button>
+              <button 
+                type="button" 
+                onClick={() => setActiveSubView(null)} 
+                className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer"
+              >
+                &times;
+              </button>
             </div>
-            
-            <div className="space-y-4 mb-6">
+
+            <div className="space-y-3">
               <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl">
                 <div>
                   <h4 className="font-bold text-sm text-gray-900">Biometric Lock</h4>
-                  <p className="text-xs text-gray-500">Require fingerprint/face ID</p>
+                  <p className="text-xs text-gray-500">Require Fingerprint / Face ID to open app</p>
                 </div>
                 <button 
                   type="button"
-                  onClick={() => setPrivacySettings({...privacySettings, biometric: !privacySettings.biometric})}
+                  onClick={() => savePrivacySettings({ ...privacySettings, biometric: !privacySettings.biometric })}
                   className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${privacySettings.biometric ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
                 >
                   <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
@@ -530,13 +511,163 @@ export default function Profile({ onLogout }) {
 
               <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl">
                 <div>
-                  <h4 className="font-bold text-sm text-gray-900">Two-Factor Auth</h4>
-                  <p className="text-xs text-gray-500">Extra layer of account security</p>
+                  <h4 className="font-bold text-sm text-gray-900">Two-Factor Authentication</h4>
+                  <p className="text-xs text-gray-500">Require OTP code during new device logins</p>
                 </div>
                 <button 
                   type="button"
-                  onClick={() => setPrivacySettings({...privacySettings, twoFactor: !privacySettings.twoFactor})}
+                  onClick={() => savePrivacySettings({ ...privacySettings, twoFactor: !privacySettings.twoFactor })}
                   className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${privacySettings.twoFactor ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl">
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900">HIPAA Health Data Sharing</h4>
+                  <p className="text-xs text-gray-500">Allow certified clinics to view test history</p>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => savePrivacySettings({ ...privacySettings, hipaaSharing: !privacySettings.hipaaSharing })}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${privacySettings.hipaaSharing ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl">
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900">Hide Vitals on Screen Lock</h4>
+                  <p className="text-xs text-gray-500">Mask sensitive health stats in notifications</p>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => savePrivacySettings({ ...privacySettings, hideVitalsOnLock: !privacySettings.hideVitalsOnLock })}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${privacySettings.hideVitalsOnLock ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
+                </button>
+              </div>
+
+              <div className="bg-gray-50 p-3.5 rounded-2xl space-y-1">
+                <label className="block text-sm font-bold text-gray-900">Inactivity Auto-Lock Timeout</label>
+                <select 
+                  value={privacySettings.autoLogoutMinutes}
+                  onChange={(e) => savePrivacySettings({ ...privacySettings, autoLogoutMinutes: e.target.value })}
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-700"
+                >
+                  <option value="5">Lock after 5 minutes</option>
+                  <option value="15">Lock after 15 minutes</option>
+                  <option value="30">Lock after 30 minutes</option>
+                  <option value="60">Lock after 1 hour</option>
+                </select>
+              </div>
+
+              <div className="pt-2">
+                <button 
+                  type="button"
+                  onClick={() => alert('Password Reset email has been dispatched to your email.')}
+                  className="w-full border border-teal-700 text-teal-800 hover:bg-teal-50 py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer"
+                >
+                  🔑 Change Account Password
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setActiveSubView(null)}
+              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow text-sm cursor-pointer"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Advanced Notification Settings Modal */}
+      {activeSubView === 'notifications' && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+              <h3 className="text-xl font-bold text-gray-900">Notification Preferences</h3>
+              <button 
+                type="button" 
+                onClick={() => setActiveSubView(null)} 
+                className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl">
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900">Medication Dosage Alerts</h4>
+                  <p className="text-xs text-gray-500">Push alarms at exact prescription times</p>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => saveNotifSettings({ ...notifSettings, medication: !notifSettings.medication })}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${notifSettings.medication ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl">
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900">Appointment Reminders</h4>
+                  <p className="text-xs text-gray-500">Get notified 24h & 1h prior to visits</p>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => saveNotifSettings({ ...notifSettings, appointments: !notifSettings.appointments })}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${notifSettings.appointments ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl">
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900">Vaccination Schedule</h4>
+                  <p className="text-xs text-gray-500">Booster shot and injection reminders</p>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => saveNotifSettings({ ...notifSettings, vaccinations: !notifSettings.vaccinations })}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${notifSettings.vaccinations ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl">
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900">Emergency Care Alerts</h4>
+                  <p className="text-xs text-gray-500">Critical vital threshold popups</p>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => saveNotifSettings({ ...notifSettings, emergencyAlerts: !notifSettings.emergencyAlerts })}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${notifSettings.emergencyAlerts ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-2xl">
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900">Weekly Health Email Reports</h4>
+                  <p className="text-xs text-gray-500">Send weekly summary to registered email</p>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => saveNotifSettings({ ...notifSettings, emailSummaries: !notifSettings.emailSummaries })}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${notifSettings.emailSummaries ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
                 >
                   <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
                 </button>
@@ -554,22 +685,85 @@ export default function Profile({ onLogout }) {
         </div>
       )}
 
-      {activeSubView === 'medical' && (
+      {/* Last Health Checkup Detail Modal */}
+      {activeSubView === 'checkup' && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-900">Medical Status Overview</h3>
-              <button type="button" onClick={() => setActiveSubView(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer">&times;</button>
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+              <h3 className="text-xl font-bold text-gray-900">Clinical Checkup Summary</h3>
+              <button 
+                type="button" 
+                onClick={() => setActiveSubView(null)} 
+                className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer"
+              >
+                &times;
+              </button>
             </div>
-            <p className="text-gray-700 text-sm mb-6 leading-relaxed bg-teal-50 p-4 rounded-2xl border border-teal-100">
-              Your immunization records and last clinical checkup with Dr. Alex River are fully verified and up to date.
+
+            <div className="bg-teal-50/70 border border-teal-100 rounded-2xl p-4 text-xs text-gray-700 space-y-2">
+              <p>🩺 <strong>Attending Physician:</strong> Dr. Alex River</p>
+              <p>📅 <strong>Date:</strong> 15 October 2023</p>
+              <p>🏥 <strong>Location:</strong> VIVA Medical Center</p>
+              <p>📊 <strong>Vitals Captured:</strong> BP 120/80 mmHg • Pulse 72 bpm • SpO2 98%</p>
+            </div>
+
+            <p className="text-xs text-gray-600 leading-relaxed bg-gray-50 p-3 rounded-xl border border-gray-100">
+              <strong>Assessment:</strong> General physical examination complete. Patient in good health. Blood sugar and lipid profile within optimal ranges. Next checkup scheduled for annual evaluation.
             </p>
+
             <button
               type="button"
               onClick={() => setActiveSubView(null)}
-              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium text-sm cursor-pointer"
+              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition text-sm cursor-pointer shadow"
             >
-              Close
+              Close Record
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Vaccination Status Detail Modal */}
+      {activeSubView === 'vaccination' && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+              <h3 className="text-xl font-bold text-gray-900">Immunization Badge</h3>
+              <button 
+                type="button" 
+                onClick={() => setActiveSubView(null)} 
+                className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center space-y-1">
+              <span className="text-2xl">🛡️</span>
+              <h4 className="text-sm font-bold text-emerald-800">Verified Vaccine Record</h4>
+              <p className="text-xs text-emerald-700">All standard immunizations & boosters up to date</p>
+            </div>
+
+            <div className="space-y-2 text-xs text-gray-600">
+              <div className="flex justify-between bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+                <span>COVID-19 Booster</span>
+                <span className="font-bold text-emerald-700">Completed (Aug 2024)</span>
+              </div>
+              <div className="flex justify-between bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+                <span>Tetanus Toxoid</span>
+                <span className="font-bold text-emerald-700">Completed (Mar 2023)</span>
+              </div>
+              <div className="flex justify-between bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+                <span>Hepatitis B Series</span>
+                <span className="font-bold text-emerald-700">Completed</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setActiveSubView(null)}
+              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition text-sm cursor-pointer shadow"
+            >
+              Close Status
             </button>
           </div>
         </div>
