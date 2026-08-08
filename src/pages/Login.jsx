@@ -247,7 +247,7 @@ export default function Login({ onLogin }) {
                     <input 
                       type="email" 
                       required
-                      autoComplete="off"
+                      autoComplete="new-password"
                       placeholder="alex@example.com" 
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -333,7 +333,7 @@ export default function Login({ onLogin }) {
                   <input 
                     type="text" 
                     required
-                    autoComplete="off"
+                    autoComplete="none"
                     placeholder="Enter Full Name" 
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
@@ -349,7 +349,7 @@ export default function Login({ onLogin }) {
                   <input 
                     type="email" 
                     required
-                    autoComplete="off"
+                    autoComplete="new-password"
                     placeholder="alex@example.com" 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -376,7 +376,7 @@ export default function Login({ onLogin }) {
                   <input 
                     type={showPassword ? 'text' : 'password'} 
                     required
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                     placeholder="••••••••" 
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
