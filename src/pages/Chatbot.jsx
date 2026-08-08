@@ -29,14 +29,14 @@ export default function Chatbot() {
       return JSON.parse(localStorage.getItem(getCacheKey('chat_history'))) || [
         {
           sender: 'bot',
-          text: `Hello ${profile.name || 'there'}! 👋 I am your Medcare Personal Assistant. How can I help you with your health schedule or reports today?`
+          text: `Hello ${profile.name || 'there'}! 👋 I am your Medcare Personal AI Assistant. How can I help you with your health schedule, medications, or records today?`
         }
       ];
     } catch {
       return [
         {
           sender: 'bot',
-          text: 'Hello! I am your Medcare Personal Assistant. How can I assist you today?'
+          text: 'Hello! I am your Medcare Personal AI Assistant. How can I assist you today?'
         }
       ];
     }
@@ -45,7 +45,7 @@ export default function Chatbot() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Auto-scroll to bottom of chat
+  // Auto-scroll to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     localStorage.setItem(getCacheKey('chat_history'), JSON.stringify(messages));
@@ -61,13 +61,12 @@ export default function Chatbot() {
     setLoading(true);
 
     try {
-      // Gather personal context payload to guide the AI safely
       const contextPayload = {
         userName: profile.name || 'Patient',
         patientId: profile.patientId || '#MC8829',
         bloodGroup: profile.bloodGroup || 'Not specified',
         weight: profile.weight || 'Not specified',
-        activeMedications: medications.map(m => `${m.name} (${m.dosage || 'standard dosage'})`).join(', ') || 'None logged'
+        activeMedications: medications.map(m => `${m.name} (${m.dosage || 'standard dose'})`).join(', ') || 'None logged'
       };
 
       const response = await fetch(`${API_BASE_URL}/api/chat`, {
@@ -86,14 +85,14 @@ export default function Chatbot() {
       } else {
         setMessages(prev => [
           ...prev,
-          { sender: 'bot', text: "I'm having trouble connecting to the medical server right now. Please try again in a moment." }
+          { sender: 'bot', text: "I'm having trouble reaching the medical AI server right now. Please ensure your Express backend is running." }
         ]);
       }
     } catch (error) {
-      console.error('Chatbot API error:', error);
+      console.error('Chatbot API Error:', error);
       setMessages(prev => [
         ...prev,
-        { sender: 'bot', text: 'Network connection issue. Please check your internet connection.' }
+        { sender: 'bot', text: 'Network connection issue. Please check if your backend API server is online.' }
       ]);
     } finally {
       setLoading(false);
@@ -112,10 +111,10 @@ export default function Chatbot() {
   };
 
   const quickPrompts = [
-    "What medications am I taking?",
-    "Give me tips for staying hydrated",
-    "How do I prepare for my next appointment?",
-    "Explain my blood group details"
+    "What active medications am I taking?",
+    "Tips for maintaining healthy blood pressure",
+    "How should I prepare for my doctor visit?",
+    "Remind me about hydration goals"
   ];
 
   return (
@@ -130,20 +129,20 @@ export default function Chatbot() {
             <h2 className="font-bold text-slate-900 text-base flex items-center gap-1.5">
               Medcare Assistant <Sparkles size={16} className="text-amber-500 fill-amber-500" />
             </h2>
-            <p className="text-xs text-slate-500">Personalized AI Health Guide</p>
+            <p className="text-xs text-slate-500">Personalized Medical Guide</p>
           </div>
         </div>
 
         <button 
           onClick={handleClearHistory}
           className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
-          title="Clear Chat"
+          title="Clear Chat History"
         >
           <RefreshCw size={18} />
         </button>
       </div>
 
-      {/* Message List */}
+      {/* Messages */}
       <div className="flex-1 bg-white border border-slate-200 rounded-3xl p-4 overflow-y-auto space-y-4 shadow-sm">
         {messages.map((msg, index) => (
           <div 
@@ -172,14 +171,14 @@ export default function Chatbot() {
               <Bot size={16} />
             </div>
             <div className="bg-slate-100 border border-slate-200/60 p-3 rounded-2xl rounded-tl-none text-xs text-slate-500 animate-pulse flex items-center gap-2">
-              <span>Medcare AI is typing...</span>
+              <span>Medcare AI is analyzing your query...</span>
             </div>
           </div>
         )}
         <div ref={chatEndRef} />
       </div>
 
-      {/* Suggested Quick Prompts */}
+      {/* Suggested Prompts */}
       <div className="flex gap-2 overflow-x-auto py-3 no-scrollbar">
         {quickPrompts.map((prompt, idx) => (
           <button
@@ -192,7 +191,7 @@ export default function Chatbot() {
         ))}
       </div>
 
-      {/* Input Form */}
+      {/* Form Input */}
       <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="relative flex items-center">
         <input 
           type="text" 
