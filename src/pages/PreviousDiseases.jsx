@@ -2,7 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 
 export default function PreviousDiseases() {
-  const [diseases, setDiseases] = useState([]);
+  // Read immediately from LocalStorage for instant load & offline resilience
+  const [diseases, setDiseases] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('cached_previous_diseases')) || [];
+    } catch {
+      return [];
+    }
+  });
+
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeDetails, setActiveDetails] = useState(null);
@@ -24,21 +32,23 @@ export default function PreviousDiseases() {
       const response = await fetch(`${API_BASE_URL}/api/previous-diseases/${userId}`);
       if (response.ok) {
         const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const formatted = data.map(item => ({
+            id: item._id,
+            name: item.diseaseName || 'Unnamed Condition',
+            category: item.category || 'GENERAL',
+            diagnosed: item.diagnosedDate || 'N/A',
+            status: item.status || 'Ongoing',
+            doctor: item.treatingDoctor || 'Attending Physician',
+            notes: item.notes || 'No additional notes provided.'
+          }));
 
-        const formatted = data.map(item => ({
-          id: item._id,
-          name: item.diseaseName || 'Unnamed Condition',
-          category: item.category || 'GENERAL',
-          diagnosed: item.diagnosedDate || 'N/A',
-          status: item.status || 'Ongoing',
-          doctor: item.treatingDoctor || 'Attending Physician',
-          notes: item.notes || 'No additional notes provided.'
-        }));
-
-        setDiseases(formatted);
+          setDiseases(formatted);
+          localStorage.setItem('cached_previous_diseases', JSON.stringify(formatted));
+        }
       }
     } catch (error) {
-      console.error('Error fetching medical history:', error);
+      console.warn('Error fetching medical history, using local cache:', error);
     }
   };
 
@@ -49,6 +59,28 @@ export default function PreviousDiseases() {
       alert('Please enter both Condition Name and Diagnosis Date.');
       return;
     }
+
+    const tempId = Date.now().toString();
+    const newDisease = {
+      id: tempId,
+      name: conditionName.trim(),
+      category: category || 'RESPIRATORY',
+      diagnosed: diagDate.trim(),
+      status: 'Ongoing',
+      doctor: doctorName.trim() || 'Attending Physician',
+      notes: notes.trim() || 'No additional notes provided.'
+    };
+
+    const updatedList = [newDisease, ...diseases];
+    setDiseases(updatedList);
+    localStorage.setItem('cached_previous_diseases', JSON.stringify(updatedList));
+
+    setIsModalOpen(false);
+    setConditionName('');
+    setCategory('RESPIRATORY');
+    setDiagDate('');
+    setDoctorName('');
+    setNotes('');
 
     const payload = {
       userId,
@@ -69,32 +101,14 @@ export default function PreviousDiseases() {
 
       if (response.ok) {
         const saved = await response.json();
-
-        const newDisease = {
-          id: saved._id,
-          name: saved.diseaseName,
-          category: saved.category,
-          diagnosed: saved.diagnosedDate,
-          status: saved.status || 'Ongoing',
-          doctor: saved.treatingDoctor,
-          notes: saved.notes
-        };
-
-        setDiseases([newDisease, ...diseases]);
-        setIsModalOpen(false);
-
-        setConditionName('');
-        setCategory('RESPIRATORY');
-        setDiagDate('');
-        setDoctorName('');
-        setNotes('');
-      } else {
-        const errData = await response.json();
-        alert(`Failed to save condition: ${errData.error || 'Server validation error'}`);
+        setDiseases(prev => {
+          const synced = prev.map(d => d.id === tempId ? { ...d, id: saved._id } : d);
+          localStorage.setItem('cached_previous_diseases', JSON.stringify(synced));
+          return synced;
+        });
       }
     } catch (error) {
-      console.error('Error saving condition:', error);
-      alert('Network error connecting to backend API');
+      console.error('Error saving condition to server:', error);
     }
   };
 
@@ -102,19 +116,20 @@ export default function PreviousDiseases() {
     e.stopPropagation();
     if (!window.confirm('Are you sure you want to remove this medical history record?')) return;
 
+    const updatedList = diseases.filter(d => d.id !== id);
+    setDiseases(updatedList);
+    localStorage.setItem('cached_previous_diseases', JSON.stringify(updatedList));
+
+    if (activeDetails && activeDetails.id === id) {
+      setActiveDetails(null);
+    }
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/previous-diseases/${id}`, {
+      await fetch(`${API_BASE_URL}/api/previous-diseases/${id}`, {
         method: 'DELETE'
       });
-
-      if (response.ok) {
-        setDiseases(diseases.filter(d => d.id !== id));
-        if (activeDetails && activeDetails.id === id) {
-          setActiveDetails(null);
-        }
-      }
     } catch (error) {
-      console.error('Error removing record:', error);
+      console.error('Error removing record from server:', error);
     }
   };
 
@@ -238,7 +253,7 @@ export default function PreviousDiseases() {
                 <input 
                   type="text" 
                   required 
-                  placeholder="e.g., March 2024" 
+                  placeholder="e.g., March 2026" 
                   value={diagDate} 
                   onChange={e => setDiagDate(e.target.value)} 
                   className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700 text-sm" 

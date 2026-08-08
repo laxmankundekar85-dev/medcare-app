@@ -2,7 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../config';
 
 export default function Records() {
-  const [records, setRecords] = useState([]);
+  // Read immediately from LocalStorage for instant load & offline resilience
+  const [records, setRecords] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('cached_clinical_records')) || [];
+    } catch {
+      return [];
+    }
+  });
+
   const [recentlyUpdatedList, setRecentlyUpdatedList] = useState([
     { id: 101, title: 'Annual Physical Notes', subtitle: 'Dr. Alex River • 2 days ago', fileUrl: null },
     { id: 102, title: 'Blood Work Analysis', subtitle: 'Central Lab • 5 days ago', fileUrl: null }
@@ -47,30 +55,32 @@ export default function Records() {
       if (response.ok) {
         const data = await response.json();
         
-        // Transform backend objects into UI format
-        const formatted = data.map(item => {
-          let computedMonth = getCurrentMonthHeader();
-          if (item.createdAt) {
-            computedMonth = new Date(item.createdAt).toLocaleString('default', { month: 'long', year: 'numeric' }).toUpperCase();
-          }
+        if (Array.isArray(data) && data.length > 0) {
+          const formatted = data.map(item => {
+            let computedMonth = getCurrentMonthHeader();
+            if (item.createdAt) {
+              computedMonth = new Date(item.createdAt).toLocaleString('default', { month: 'long', year: 'numeric' }).toUpperCase();
+            }
 
-          return {
-            id: item._id,
-            title: item.title,
-            category: item.category || 'LAB RESULT',
-            location: item.doctor || item.summary || 'Clinical File',
-            date: item.date || 'Recently Updated',
-            month: computedMonth,
-            fileUrl: item.fileUrl || (item.summary?.startsWith('data:') ? item.summary : null),
-            icon: item.category === 'IMAGING' ? '🩻' : item.category === 'CERTIFICATE' ? '💉' : item.category === 'DOCTOR NOTES' ? '📄' : '💧',
-            recentlyUpdated: false
-          };
-        });
+            return {
+              id: item._id,
+              title: item.title,
+              category: item.category || 'LAB RESULT',
+              location: item.doctor || item.summary || 'Clinical File',
+              date: item.date || 'Recently Updated',
+              month: computedMonth,
+              fileUrl: item.fileUrl || (item.summary?.startsWith('data:') ? item.summary : null),
+              icon: item.category === 'IMAGING' ? '🩻' : item.category === 'CERTIFICATE' ? '💉' : item.category === 'DOCTOR NOTES' ? '📄' : '💧',
+              recentlyUpdated: false
+            };
+          });
 
-        setRecords(formatted);
+          setRecords(formatted);
+          localStorage.setItem('cached_clinical_records', JSON.stringify(formatted));
+        }
       }
     } catch (error) {
-      console.error('Error fetching records:', error);
+      console.warn('Error fetching records, using local cache:', error);
     }
   };
 
@@ -102,6 +112,29 @@ export default function Records() {
     if (!title || !location) return;
 
     const currentMonth = getCurrentMonthHeader();
+    const tempId = Date.now().toString();
+
+    const newRecord = {
+      id: tempId,
+      title: title,
+      category: category,
+      location: location,
+      date: 'Just now',
+      month: currentMonth,
+      fileUrl: fileDataUrl,
+      icon: selectedFile?.type?.includes('pdf') ? '📄' : '📁',
+      recentlyUpdated: true
+    };
+
+    const updatedList = [newRecord, ...records];
+    setRecords(updatedList);
+    localStorage.setItem('cached_clinical_records', JSON.stringify(updatedList));
+
+    setTitle('');
+    setLocation('');
+    setSelectedFile(null);
+    setFileDataUrl(null);
+    setIsModalOpen(false);
 
     const payload = {
       userId,
@@ -122,33 +155,14 @@ export default function Records() {
 
       if (response.ok) {
         const savedRecord = await response.json();
-
-        const newRecord = {
-          id: savedRecord._id,
-          title: savedRecord.title,
-          category: savedRecord.category,
-          location: savedRecord.doctor,
-          date: savedRecord.date,
-          month: currentMonth,
-          fileUrl: savedRecord.fileUrl || fileDataUrl,
-          icon: selectedFile?.type?.includes('pdf') ? '📄' : '📁',
-          recentlyUpdated: true
-        };
-
-        setRecords([newRecord, ...records]);
-        setTitle('');
-        setLocation('');
-        setSelectedFile(null);
-        setFileDataUrl(null);
-        setIsModalOpen(false);
-        alert('✅ Record uploaded and saved successfully!');
-      } else {
-        const errData = await response.json().catch(() => ({}));
-        alert(`❌ Upload failed (${response.status}): ${errData.error || 'Unable to save record to server.'}`);
+        setRecords(prev => {
+          const synced = prev.map(r => r.id === tempId ? { ...r, id: savedRecord._id } : r);
+          localStorage.setItem('cached_clinical_records', JSON.stringify(synced));
+          return synced;
+        });
       }
     } catch (error) {
-      console.error('Error saving record:', error);
-      alert('❌ Network error connecting to backend API.');
+      console.error('Error saving record to server:', error);
     }
   };
 
@@ -158,19 +172,17 @@ export default function Records() {
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this clinical record?')) return;
 
+    const updatedList = records.filter(r => r.id !== id);
+    setRecords(updatedList);
+    localStorage.setItem('cached_clinical_records', JSON.stringify(updatedList));
+    setActiveMenuId(null);
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/records/${id}`, {
+      await fetch(`${API_BASE_URL}/api/records/${id}`, {
         method: 'DELETE'
       });
-
-      if (response.ok) {
-        setRecords(records.filter(r => r.id !== id));
-        setActiveMenuId(null);
-      } else {
-        alert('Failed to delete record from server.');
-      }
     } catch (error) {
-      console.error('Error deleting record:', error);
+      console.error('Error deleting record from server:', error);
     }
   };
 

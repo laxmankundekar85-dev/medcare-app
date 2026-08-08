@@ -259,7 +259,7 @@ export default function Login({ onLogin }) {
                 <button 
                   type="submit" 
                   disabled={loading}
-                  className="w-full bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl font-medium mt-2 flex justify-center items-center gap-2 transition shadow-sm disabled:opacity-50"
+                  className="w-full bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl font-medium mt-2 flex justify-center items-center gap-2 transition shadow-sm disabled:opacity-50 cursor-pointer"
                 >
                   <span>{loading ? 'Sending OTP...' : 'Send Verification OTP'}</span>
                 </button>
@@ -299,7 +299,7 @@ export default function Login({ onLogin }) {
                     <button 
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600"
+                      className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 cursor-pointer"
                     >
                       {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                     </button>
@@ -309,7 +309,7 @@ export default function Login({ onLogin }) {
                 <button 
                   type="submit" 
                   disabled={loading}
-                  className="w-full bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl font-medium mt-2 flex justify-center items-center gap-2 transition shadow-sm disabled:opacity-50"
+                  className="w-full bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl font-medium mt-2 flex justify-center items-center gap-2 transition shadow-sm disabled:opacity-50 cursor-pointer"
                 >
                   <span>{loading ? 'Updating Password...' : 'Verify OTP & Set Password'}</span>
                 </button>
@@ -319,7 +319,7 @@ export default function Login({ onLogin }) {
             <button 
               type="button" 
               onClick={() => { setIsForgotPassword(false); setOtpSent(false); clearFormState(); }}
-              className="mt-6 text-sm text-teal-700 font-medium hover:underline flex items-center justify-center gap-2 w-full"
+              className="mt-6 text-sm text-teal-700 font-medium hover:underline flex items-center justify-center gap-2 w-full cursor-pointer"
             >
               <ArrowLeft size={16} /> Back to Sign In
             </button>
@@ -365,7 +365,7 @@ export default function Login({ onLogin }) {
                     <button 
                       type="button" 
                       onClick={() => { setIsForgotPassword(true); clearFormState(); }}
-                      className="text-xs text-teal-700 font-semibold hover:underline"
+                      className="text-xs text-teal-700 font-semibold hover:underline cursor-pointer"
                     >
                       Forgot Password?
                     </button>
@@ -385,7 +385,7 @@ export default function Login({ onLogin }) {
                   <button 
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600"
+                    className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 cursor-pointer"
                   >
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
@@ -394,7 +394,7 @@ export default function Login({ onLogin }) {
 
               <button 
                 type="submit" 
-                className="w-full bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl font-medium mt-2 flex justify-center items-center gap-2 transition shadow-sm"
+                className="w-full bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl font-medium mt-2 flex justify-center items-center gap-2 transition shadow-sm cursor-pointer"
               >
                 <span>{isRegistering ? 'Register Account' : 'Sign In'}</span> 
                 <LogOut size={18} className="rotate-180" />
@@ -410,7 +410,7 @@ export default function Login({ onLogin }) {
             <button 
               type="button"
               onClick={handleGoogleLogin}
-              className="w-full bg-white border border-slate-200 hover:bg-slate-50 py-3 rounded-xl font-medium flex justify-center items-center gap-2 transition text-sm text-slate-700"
+              className="w-full bg-white border border-slate-200 hover:bg-slate-50 py-3 rounded-xl font-medium flex justify-center items-center gap-2 transition text-sm text-slate-700 cursor-pointer"
             >
               <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
               Continue with Google
@@ -425,8 +425,9 @@ export default function Login({ onLogin }) {
             <p>
               Already have an account?{' '}
               <button 
+                type="button"
                 onClick={() => { setIsRegistering(false); clearFormState(); }} 
-                className="text-teal-700 font-medium hover:underline"
+                className="text-teal-700 font-medium hover:underline cursor-pointer"
               >
                 Sign In
               </button>
@@ -435,8 +436,9 @@ export default function Login({ onLogin }) {
             <p>
               Don't have an account?{' '}
               <button 
+                type="button"
                 onClick={() => { setIsRegistering(true); clearFormState(); }} 
-                className="text-teal-700 font-medium hover:underline"
+                className="text-teal-700 font-medium hover:underline cursor-pointer"
               >
                 Register
               </button>

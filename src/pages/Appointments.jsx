@@ -4,7 +4,15 @@ import { API_BASE_URL } from '../config';
 export default function Appointments() {
   const [selectedDate, setSelectedDate] = useState('Mon 12');
 
-  const [upcoming, setUpcoming] = useState([]);
+  // Read immediately from LocalStorage for instant load & offline resilience
+  const [upcoming, setUpcoming] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('cached_appointments')) || [];
+    } catch {
+      return [];
+    }
+  });
+
   const [history, setHistory] = useState([
     {
       id: 101,
@@ -51,23 +59,30 @@ export default function Appointments() {
       const response = await fetch(`${API_BASE_URL}/api/appointments/${userId}`);
       if (response.ok) {
         const data = await response.json();
-        const formatted = data.map(item => ({
-          id: item._id,
-          doctor: item.doctorName,
-          specialty: item.specialty || 'General Practitioner',
-          date: item.date,
-          time: item.time,
-          status: item.status || 'Confirmed'
-        }));
-        setUpcoming(formatted);
+        if (Array.isArray(data) && data.length > 0) {
+          const formatted = data.map(item => ({
+            id: item._id,
+            doctor: item.doctorName || item.doctor,
+            specialty: item.specialty || 'General Practitioner',
+            date: item.date,
+            time: item.time,
+            status: item.status || 'Confirmed'
+          }));
+          setUpcoming(formatted);
+          localStorage.setItem('cached_appointments', JSON.stringify(formatted));
+        }
       }
     } catch (error) {
-      console.error('Error fetching appointments:', error);
+      console.warn('Error fetching appointments, using local cache:', error);
     }
   };
 
   const handleCancel = async (id) => {
     if (!window.confirm('Are you sure you want to cancel this appointment?')) return;
+
+    const updated = upcoming.filter(app => app.id !== id);
+    setUpcoming(updated);
+    localStorage.setItem('cached_appointments', JSON.stringify(updated));
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/appointments/${id}`, {
@@ -75,19 +90,22 @@ export default function Appointments() {
       });
 
       if (response.ok) {
-        setUpcoming(prev => prev.filter(app => app.id !== id));
         alert('Appointment successfully cancelled.');
       }
     } catch (error) {
-      console.error('Error cancelling appointment:', error);
+      console.error('Error cancelling appointment on server:', error);
     }
   };
 
-  const handleReschedule = (id) => {
-    const newDate = prompt('Enter new date (e.g., Aug 20, 2024):');
+  const handleReschedule = async (id) => {
+    const newDate = prompt('Enter new date (e.g., Aug 20, 2026):');
     const newTime = prompt('Enter new time (e.g., 11:00 AM):');
     if (newDate && newTime) {
-      setUpcoming(prev => prev.map(app => app.id === id ? { ...app, date: newDate, time: newTime } : app));
+      const updated = upcoming.map(app => 
+        app.id === id ? { ...app, date: newDate, time: newTime } : app
+      );
+      setUpcoming(updated);
+      localStorage.setItem('cached_appointments', JSON.stringify(updated));
       alert('Appointment rescheduled successfully!');
     }
   };
@@ -95,6 +113,26 @@ export default function Appointments() {
   const handleAddAppointment = async (e) => {
     e.preventDefault();
     if (!docName || !appDate) return;
+
+    const tempId = Date.now().toString();
+    const newApp = {
+      id: tempId,
+      doctor: docName,
+      specialty: specialty || 'Specialist',
+      date: appDate,
+      time: appTime || '10:00 AM',
+      status: 'Confirmed'
+    };
+
+    const updatedList = [newApp, ...upcoming];
+    setUpcoming(updatedList);
+    localStorage.setItem('cached_appointments', JSON.stringify(updatedList));
+
+    setDocName('');
+    setSpecialty('');
+    setAppDate('');
+    setAppTime('');
+    setIsModalOpen(false);
 
     const payload = {
       userId,
@@ -114,25 +152,14 @@ export default function Appointments() {
 
       if (response.ok) {
         const savedAppt = await response.json();
-        
-        const newApp = {
-          id: savedAppt._id,
-          doctor: savedAppt.doctorName,
-          specialty: savedAppt.specialty,
-          date: savedAppt.date,
-          time: savedAppt.time,
-          status: savedAppt.status
-        };
-
-        setUpcoming(prev => [newApp, ...prev]);
-        setDocName('');
-        setSpecialty('');
-        setAppDate('');
-        setAppTime('');
-        setIsModalOpen(false);
+        setUpcoming(prev => {
+          const synced = prev.map(a => a.id === tempId ? { ...a, id: savedAppt._id } : a);
+          localStorage.setItem('cached_appointments', JSON.stringify(synced));
+          return synced;
+        });
       }
     } catch (error) {
-      console.error('Error saving appointment:', error);
+      console.error('Error saving appointment to server:', error);
     }
   };
 
@@ -146,7 +173,7 @@ export default function Appointments() {
   ];
 
   return (
-    <div className="p-6 max-w-4xl mx-auto pb-32 relative">
+    <div className="p-6 max-w-4xl mx-auto pb-32 relative font-sans">
       <div className="flex gap-3 overflow-x-auto pb-4 mb-8 no-scrollbar">
         {datePickerList.map((item, idx) => {
           const identifier = `${item.day} ${item.date}`;
@@ -154,8 +181,9 @@ export default function Appointments() {
           return (
             <button
               key={idx}
+              type="button"
               onClick={() => setSelectedDate(identifier)}
-              className={`flex flex-col items-center justify-center min-w-[70px] py-3.5 rounded-2xl transition shadow-sm ${
+              className={`flex flex-col items-center justify-center min-w-[70px] py-3.5 rounded-2xl transition shadow-sm cursor-pointer ${
                 isSelected
                   ? 'bg-teal-800 text-white shadow-teal-900/20'
                   : 'bg-white border border-gray-100 text-gray-700 hover:bg-gray-50'
@@ -172,7 +200,11 @@ export default function Appointments() {
 
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold text-gray-900">Upcoming Appointments</h2>
-        <button onClick={() => alert('Viewing all upcoming appointments')} className="text-sm font-semibold text-teal-800 hover:underline">
+        <button 
+          type="button"
+          onClick={() => alert('Viewing all upcoming appointments')} 
+          className="text-sm font-semibold text-teal-800 hover:underline cursor-pointer"
+        >
           See all
         </button>
       </div>
@@ -187,7 +219,7 @@ export default function Appointments() {
             <div key={app.id} className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-teal-50 rounded-2xl flex items-center justify-center text-teal-700 font-bold">
+                  <div className="w-12 h-12 bg-teal-50 rounded-2xl flex items-center justify-center text-teal-700 font-bold text-xl">
                     🩺
                   </div>
                   <div>
@@ -212,12 +244,14 @@ export default function Appointments() {
 
               <div className="flex gap-3">
                 <button
+                  type="button"
                   onClick={() => handleCancel(app.id)}
                   className="flex-1 border border-gray-200 hover:bg-gray-50 text-gray-700 py-2.5 rounded-2xl font-medium transition text-sm cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleReschedule(app.id)}
                   className="flex-1 bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-2xl font-medium transition text-sm shadow-sm cursor-pointer"
                 >
@@ -246,6 +280,7 @@ export default function Appointments() {
 
             <div className="pt-3 border-t border-gray-100 flex justify-between items-center mt-3">
               <button
+                type="button"
                 onClick={() => setActiveSummary(hist)}
                 className="text-xs font-bold text-teal-800 hover:underline flex items-center gap-1 cursor-pointer"
               >
@@ -257,6 +292,7 @@ export default function Appointments() {
       </div>
 
       <button
+        type="button"
         onClick={() => setIsModalOpen(true)}
         className="fixed bottom-24 right-6 bg-teal-800 hover:bg-teal-900 text-white w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-3xl transition duration-200 z-30 cursor-pointer"
         title="Schedule Appointment"
@@ -270,6 +306,7 @@ export default function Appointments() {
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-gray-900">Schedule Appointment</h3>
               <button 
+                type="button"
                 onClick={() => setIsModalOpen(false)}
                 className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer"
               >
@@ -306,7 +343,7 @@ export default function Appointments() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g., Aug 20, 2024"
+                  placeholder="e.g., Aug 20, 2026"
                   value={appDate}
                   onChange={(e) => setAppDate(e.target.value)}
                   className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-700 text-sm"
@@ -351,6 +388,7 @@ export default function Appointments() {
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-gray-900">{activeSummary.title}</h3>
               <button 
+                type="button"
                 onClick={() => setActiveSummary(null)}
                 className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer"
               >
@@ -362,6 +400,7 @@ export default function Appointments() {
               {activeSummary.summary}
             </div>
             <button
+              type="button"
               onClick={() => setActiveSummary(null)}
               className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition text-sm cursor-pointer"
             >

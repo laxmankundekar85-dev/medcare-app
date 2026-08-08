@@ -2,7 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../config';
 
 export default function Alarms() {
-  const [reminders, setReminders] = useState([]);
+  // Read immediately from LocalStorage for instant load and offline resilience
+  const [reminders, setReminders] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('cached_alarms')) || [];
+    } catch {
+      return [];
+    }
+  });
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [reminderType, setReminderType] = useState('Daily Dose');
   const [reminderTime, setReminderTime] = useState('08:00');
@@ -40,26 +48,29 @@ export default function Alarms() {
       if (response.ok) {
         const data = await response.json();
         
-        const formatted = data.map(item => {
-          const timeParts = item.time ? item.time.split(' ') : ['08:00', 'AM'];
-          const parsedTime = timeParts[0] || item.time;
-          const parsedPeriod = timeParts[1] || 'AM';
+        if (Array.isArray(data) && data.length > 0) {
+          const formatted = data.map(item => {
+            const timeParts = item.time ? item.time.split(' ') : ['08:00', 'AM'];
+            const parsedTime = timeParts[0] || item.time;
+            const parsedPeriod = timeParts[1] || 'AM';
 
-          return {
-            id: item._id,
-            type: item.type || 'Daily Dose',
-            time: parsedTime,
-            period: parsedPeriod,
-            label: item.label,
-            active: item.isEnabled !== undefined ? item.isEnabled : true,
-            icon: (item.type || 'Daily Dose') === 'Appointment' ? '🩺' : '💊'
-          };
-        });
+            return {
+              id: item._id,
+              type: item.type || 'Daily Dose',
+              time: parsedTime,
+              period: parsedPeriod,
+              label: item.label,
+              active: item.isEnabled !== undefined ? item.isEnabled : true,
+              icon: (item.type || 'Daily Dose') === 'Appointment' ? '🩺' : '💊'
+            };
+          });
 
-        setReminders(formatted);
+          setReminders(formatted);
+          localStorage.setItem('cached_alarms', JSON.stringify(formatted));
+        }
       }
     } catch (error) {
-      console.error('Error fetching alarms:', error);
+      console.warn('Error fetching alarms, using offline cache:', error);
     }
   };
 
@@ -176,39 +187,40 @@ export default function Alarms() {
   };
 
   const handleToggle = async (id) => {
+    const updated = reminders.map(rem => 
+      rem.id === id ? { ...rem, active: !rem.active } : rem
+    );
+    setReminders(updated);
+    localStorage.setItem('cached_alarms', JSON.stringify(updated));
+
+    setTriggeredIds(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/alarms/${id}/toggle`, {
+      await fetch(`${API_BASE_URL}/api/alarms/${id}/toggle`, {
         method: 'PATCH'
       });
-
-      if (response.ok) {
-        setReminders(prev =>
-          prev.map(rem => rem.id === id ? { ...rem, active: !rem.active } : rem)
-        );
-        setTriggeredIds(prev => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-      }
     } catch (error) {
-      console.error('Error toggling alarm:', error);
+      console.error('Error toggling alarm on server:', error);
     }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this reminder?')) return;
 
+    const updated = reminders.filter(rem => rem.id !== id);
+    setReminders(updated);
+    localStorage.setItem('cached_alarms', JSON.stringify(updated));
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/alarms/${id}`, {
+      await fetch(`${API_BASE_URL}/api/alarms/${id}`, {
         method: 'DELETE'
       });
-
-      if (response.ok) {
-        setReminders(prev => prev.filter(rem => rem.id !== id));
-      }
     } catch (error) {
-      console.error('Error deleting alarm:', error);
+      console.error('Error deleting alarm on server:', error);
     }
   };
 
@@ -222,6 +234,24 @@ export default function Alarms() {
     const formattedInputTime = `${paddedHours}:${paddedMinutes}`;
 
     const fullTimeString = `${formattedInputTime} ${reminderPeriod}`;
+
+    const tempId = Date.now().toString();
+    const newReminder = {
+      id: tempId,
+      type: reminderType,
+      time: formattedInputTime,
+      period: reminderPeriod,
+      label: reminderLabel,
+      active: true,
+      icon: reminderType === 'Appointment' ? '🩺' : '💊'
+    };
+
+    const updatedList = [...reminders, newReminder];
+    setReminders(updatedList);
+    localStorage.setItem('cached_alarms', JSON.stringify(updatedList));
+
+    setReminderLabel('');
+    setIsModalOpen(false);
 
     const payload = {
       userId,
@@ -241,23 +271,15 @@ export default function Alarms() {
 
       if (response.ok) {
         const savedAlarm = await response.json();
-
-        const newReminder = {
-          id: savedAlarm._id,
-          type: savedAlarm.type || reminderType,
-          time: formattedInputTime,
-          period: reminderPeriod,
-          label: savedAlarm.label,
-          active: savedAlarm.isEnabled !== undefined ? savedAlarm.isEnabled : true,
-          icon: reminderType === 'Appointment' ? '🩺' : '💊'
-        };
-
-        setReminders(prev => [...prev, newReminder]);
-        setReminderLabel('');
-        setIsModalOpen(false);
+        // Sync generated MongoDB ID into state & cache
+        setReminders(prev => {
+          const synced = prev.map(r => r.id === tempId ? { ...r, id: savedAlarm._id } : r);
+          localStorage.setItem('cached_alarms', JSON.stringify(synced));
+          return synced;
+        });
       }
     } catch (error) {
-      console.error('Error adding alarm:', error);
+      console.error('Error adding alarm on server:', error);
     }
   };
 

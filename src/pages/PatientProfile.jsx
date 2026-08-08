@@ -2,10 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 
 export default function PatientProfile() {
-  const [patientName, setPatientName] = useState('Laxman Babu Kundekar');
-  const [patientId, setPatientId] = useState('#MC8829');
-  const [isEditing, setIsEditing] = useState(false);
+  // Read immediately from LocalStorage for instant load & offline resilience
+  const [patientName, setPatientName] = useState(() => {
+    return localStorage.getItem('patientName') || 'Laxman Babu Kundekar';
+  });
+  const [patientId, setPatientId] = useState(() => {
+    return localStorage.getItem('patientId') || '#MC8829';
+  });
 
+  const [isEditing, setIsEditing] = useState(false);
   const [tempName, setTempName] = useState(patientName);
   const [tempId, setTempId] = useState(patientId);
 
@@ -20,11 +25,19 @@ export default function PatientProfile() {
       const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`);
       if (response.ok) {
         const data = await response.json();
-        if (data.fullName) setPatientName(data.fullName);
-        if (data.patientId) setPatientId(data.patientId);
+        if (data.fullName) {
+          setPatientName(data.fullName);
+          setTempName(data.fullName);
+          localStorage.setItem('patientName', data.fullName);
+        }
+        if (data.patientId) {
+          setPatientId(data.patientId);
+          setTempId(data.patientId);
+          localStorage.setItem('patientId', data.patientId);
+        }
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.warn('Error fetching profile, using local cache:', error);
     }
   };
 
@@ -32,27 +45,28 @@ export default function PatientProfile() {
     e.preventDefault();
     if (!tempName || !tempId) return;
 
+    // Instant local save
+    setPatientName(tempName);
+    setPatientId(tempId);
+    localStorage.setItem('patientName', tempName);
+    localStorage.setItem('patientId', tempId);
+    setIsEditing(false);
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
+      await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fullName: tempName, patientId: tempId })
       });
-
-      if (response.ok) {
-        setPatientName(tempName);
-        setPatientId(tempId);
-        setIsEditing(false);
-      }
     } catch (error) {
-      console.error('Error saving profile changes:', error);
+      console.error('Error saving profile changes to server:', error);
     }
   };
 
   return (
-    <div className="p-6 bg-white border border-gray-100 rounded-3xl shadow-sm flex items-center justify-between max-w-xl mx-auto my-6">
+    <div className="p-6 bg-white border border-gray-100 rounded-3xl shadow-sm flex items-center justify-between max-w-xl mx-auto my-6 font-sans">
       <div className="flex items-center gap-4">
-        <div className="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center text-2xl border border-teal-100">
+        <div className="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center text-2xl border border-teal-100 shrink-0">
           🧑‍🦰
         </div>
         <div>

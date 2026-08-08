@@ -30,10 +30,15 @@ export default function MedcareApp() {
   // Dynamic User State from localStorage
   const [user, setUser] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('user')) || { displayName: 'Patient' };
+      return JSON.parse(localStorage.getItem('user')) || { displayName: 'Laxman' };
     } catch {
-      return { displayName: 'Patient' };
+      return { displayName: 'Laxman' };
     }
+  });
+
+  // Avatar State read from localStorage
+  const [userAvatar, setUserAvatar] = useState(() => {
+    return localStorage.getItem('userAvatar') || null;
   });
 
   // Update user state whenever currentView changes (e.g., after logging in)
@@ -42,6 +47,10 @@ export default function MedcareApp() {
       const storedUser = JSON.parse(localStorage.getItem('user'));
       if (storedUser) {
         setUser(storedUser);
+      }
+      const storedAvatar = localStorage.getItem('userAvatar');
+      if (storedAvatar) {
+        setUserAvatar(storedAvatar);
       }
     } catch (e) {
       console.error('Error reading user data from localStorage', e);
@@ -93,7 +102,7 @@ export default function MedcareApp() {
 
   const handleLogout = () => {
     localStorage.removeItem('user');
-    setUser({ displayName: 'Patient' });
+    setUser({ displayName: 'Laxman' });
     navigateTo('login');
   };
 
@@ -101,7 +110,8 @@ export default function MedcareApp() {
     return <Login onLogin={() => navigateTo('dashboard')} />;
   }
 
-  const userDisplayName = user.displayName || 'Patient';
+  const userDisplayName = user.displayName || 'Laxman';
+  const defaultAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userDisplayName)}`;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20 relative">
@@ -115,8 +125,8 @@ export default function MedcareApp() {
         </div>
 
         {currentView === 'profile' || currentView === 'settings' ? (
-          <div className="w-8 h-8 rounded-full bg-slate-300 overflow-hidden">
-            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userDisplayName)}`} alt="Avatar" />
+          <div className="w-8 h-8 rounded-full bg-slate-300 overflow-hidden border border-slate-200">
+            <img src={userAvatar || defaultAvatar} alt="Avatar" className="w-full h-full object-cover" />
           </div>
         ) : (
           /* Wrapped container with ref to detect outside clicks */
@@ -170,8 +180,8 @@ export default function MedcareApp() {
             onClick={e => e.stopPropagation()}
           >
             <div className="p-6 flex items-center gap-4 border-b border-slate-200">
-              <div className="w-12 h-12 rounded-full bg-slate-300 overflow-hidden">
-                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userDisplayName)}`} alt="User" />
+              <div className="w-12 h-12 rounded-full bg-slate-300 overflow-hidden border border-slate-200 shrink-0">
+                <img src={userAvatar || defaultAvatar} alt="User" className="w-full h-full object-cover" />
               </div>
               <div>
                 <h2 className="font-bold text-lg">{userDisplayName}</h2>
@@ -196,6 +206,7 @@ export default function MedcareApp() {
 
             <div className="p-4">
               <button 
+                type="button"
                 onClick={() => setIsSidebarOpen(false)}
                 className="w-full flex items-center justify-center gap-2 py-3 border border-teal-700 text-teal-700 rounded-xl hover:bg-teal-50 cursor-pointer"
               >

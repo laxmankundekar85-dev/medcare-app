@@ -4,22 +4,61 @@ import { StatCard } from '../components/ui/Cards';
 import { API_BASE_URL } from '../config';
 
 export default function Dashboard() {
-  const [weight, setWeight] = useState(64);
-  const [height, setHeight] = useState(175);
+  // Read immediately from LocalStorage for instant load & offline resilience
+  const [weight, setWeight] = useState(() => {
+    return Number(localStorage.getItem('userWeight')) || 60;
+  });
+  const [height, setHeight] = useState(() => {
+    return Number(localStorage.getItem('userHeight')) || 181;
+  });
+
+  const [patientName, setPatientName] = useState(() => {
+    return localStorage.getItem('patientName') || 'Laxman';
+  });
+  const [patientId, setPatientId] = useState(() => {
+    return localStorage.getItem('patientId') || '#MC8829';
+  });
+
   const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
   const [isFabMenuOpen, setIsFabMenuOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-
-  const [patientName, setPatientName] = useState('Laxman');
-  const [patientId, setPatientId] = useState('#MC8829');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
   const [tempName, setTempName] = useState(patientName);
   const [tempId, setTempId] = useState(patientId);
 
-  const [medications, setMedications] = useState([]);
-  const [appointments, setAppointments] = useState([]);
-  const [alarms, setAlarms] = useState([]);
-  const [injections, setInjections] = useState([]);
+  const [medications, setMedications] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('cached_medications')) || [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [appointments, setAppointments] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('cached_appointments')) || [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [alarms, setAlarms] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('cached_alarms')) || [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [injections, setInjections] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('cached_injections')) || [];
+    } catch {
+      return [];
+    }
+  });
+
   const [loading, setLoading] = useState(true);
 
   const userId = "sample_firebase_user_id";
@@ -34,19 +73,27 @@ export default function Dashboard() {
       const res = await fetch(`${API_BASE_URL}/api/profile/${userId}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.weight) setWeight(Number(data.weight));
-        if (data.height) setHeight(Number(data.height));
+        if (data.weight) {
+          setWeight(Number(data.weight));
+          localStorage.setItem('userWeight', String(data.weight));
+        }
+        if (data.height) {
+          setHeight(Number(data.height));
+          localStorage.setItem('userHeight', String(data.height));
+        }
         if (data.fullName) {
           setPatientName(data.fullName);
           setTempName(data.fullName);
+          localStorage.setItem('patientName', data.fullName);
         }
         if (data.patientId) {
           setPatientId(data.patientId);
           setTempId(data.patientId);
+          localStorage.setItem('patientId', data.patientId);
         }
       }
     } catch (error) {
-      console.error('Error fetching profile data:', error);
+      console.warn('Error fetching profile data, retaining cached values:', error);
     }
   };
 
@@ -59,19 +106,35 @@ export default function Dashboard() {
         fetch(`${API_BASE_URL}/api/injections/${userId}`)
       ]);
 
-      if (medRes.ok) setMedications(await medRes.json());
-      if (apptRes.ok) setAppointments(await apptRes.json());
-      if (alarmRes.ok) setAlarms(await alarmRes.json());
-      if (injRes.ok) setInjections(await injRes.json());
+      if (medRes.ok) {
+        const medData = await medRes.json();
+        setMedications(medData);
+        localStorage.setItem('cached_medications', JSON.stringify(medData));
+      }
+      if (apptRes.ok) {
+        const apptData = await apptRes.json();
+        setAppointments(apptData);
+        localStorage.setItem('cached_appointments', JSON.stringify(apptData));
+      }
+      if (alarmRes.ok) {
+        const alarmData = await alarmRes.json();
+        setAlarms(alarmData);
+        localStorage.setItem('cached_alarms', JSON.stringify(alarmData));
+      }
+      if (injRes.ok) {
+        const injData = await injRes.json();
+        setInjections(injData);
+        localStorage.setItem('cached_injections', JSON.stringify(injData));
+      }
     } catch (error) {
-      console.error('Error loading dashboard metrics:', error);
+      console.warn('Error loading dashboard metrics, using local cache:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const heightInMeters = height / 100;
-  const bmi = heightInMeters > 0 ? (weight / (heightInMeters * heightInMeters)).toFixed(1) : '20.9';
+  const bmi = heightInMeters > 0 ? (weight / (heightInMeters * heightInMeters)).toFixed(1) : '18.3';
 
   const totalMeds = medications.length;
   const takenMeds = medications.filter(m => m.status === 'Taken' || m.status === 'Completed').length;
@@ -93,56 +156,58 @@ export default function Dashboard() {
     }
   };
 
-  const handleSaveVitals = async () => {
+  const handleSaveVitals = async (e) => {
+    if (e) e.preventDefault();
+
+    localStorage.setItem('userWeight', String(weight));
+    localStorage.setItem('userHeight', String(height));
+    setIsVitalsModalOpen(false);
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
+      await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          fullName: patientName,
+          patientId: patientId,
           weight: Number(weight),
           height: Number(height)
         })
       });
-
-      if (response.ok) {
-        setIsVitalsModalOpen(false);
-      } else {
-        alert("Failed to save vitals to server.");
-      }
     } catch (error) {
-      console.error('Error saving vitals:', error);
+      console.error('Error saving vitals to server:', error);
     }
   };
 
   const handleSaveProfile = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!tempName || !tempId) return;
 
+    setPatientName(tempName);
+    setPatientId(tempId);
+    localStorage.setItem('patientName', tempName);
+    localStorage.setItem('patientId', tempId);
+    setIsProfileModalOpen(false);
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
+      await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fullName: tempName,
-          patientId: tempId
+          patientId: tempId,
+          weight: Number(weight),
+          height: Number(height)
         })
       });
-
-      if (response.ok) {
-        setPatientName(tempName);
-        setPatientId(tempId);
-        setIsProfileModalOpen(false);
-      } else {
-        alert("Failed to save profile changes.");
-      }
     } catch (error) {
-      console.error('Error saving profile:', error);
+      console.error('Error saving profile to server:', error);
     }
   };
 
   return (
     <div className="space-y-6 pb-24 relative font-sans" onClick={() => setIsFabMenuOpen(false)}>
-      {/* Top Banner Card (Removed onClick from container) */}
+      {/* Top Banner Card */}
       <div className="flex justify-between items-start bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <div>
           <h2 className="text-3xl font-bold text-slate-900">Good morning, {patientName}.</h2>
@@ -152,7 +217,6 @@ export default function Dashboard() {
           </p>
         </div>
         
-        {/* onClick is now ONLY attached to this button */}
         <button 
           type="button"
           onClick={(e) => {
@@ -282,6 +346,7 @@ export default function Dashboard() {
         </button>
       </div>
 
+      {/* Vitals Modal */}
       {isVitalsModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl">
@@ -296,7 +361,7 @@ export default function Dashboard() {
               </button>
             </div>
 
-            <div className="space-y-4">
+            <form onSubmit={handleSaveVitals} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Weight (kg)</label>
                 <input
@@ -322,17 +387,17 @@ export default function Dashboard() {
               </div>
 
               <button
-                type="button"
-                onClick={handleSaveVitals}
+                type="submit"
                 className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition shadow text-sm cursor-pointer"
               >
                 Save Changes
               </button>
-            </div>
+            </form>
           </div>
         </div>
       )}
 
+      {/* Edit Profile Modal */}
       {isProfileModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={(e) => e.stopPropagation()}>
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl">
@@ -390,6 +455,7 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Report Modal */}
       {isReportModalOpen && (
         <div 
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4" 

@@ -2,7 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 
 export default function Injections() {
-  const [injections, setInjections] = useState([]);
+  // Read immediately from LocalStorage for instant load & offline resilience
+  const [injections, setInjections] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('cached_injections')) || [];
+    } catch {
+      return [];
+    }
+  });
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [activeDetails, setActiveDetails] = useState(null);
@@ -25,27 +32,50 @@ export default function Injections() {
       const response = await fetch(`${API_BASE_URL}/api/injections/${userId}`);
       if (response.ok) {
         const data = await response.json();
-        
-        const formatted = data.map(item => ({
-          id: item._id,
-          name: item.name,
-          date: item.timing || 'Scheduled',
-          status: item.status || 'Confirmed',
-          doctor: item.doctor || 'Dr. Alex River',
-          location: item.location || 'VIVA Medical Center',
-          notes: item.notes || 'Scheduled immunization.'
-        }));
+        if (Array.isArray(data) && data.length > 0) {
+          const formatted = data.map(item => ({
+            id: item._id,
+            name: item.name || item.title,
+            date: item.timing || item.date || 'Scheduled',
+            status: item.status || 'Confirmed',
+            doctor: item.doctor || 'Dr. Alex River',
+            location: item.location || 'VIVA Medical Center',
+            notes: item.notes || 'Scheduled immunization.'
+          }));
 
-        setInjections(formatted);
+          setInjections(formatted);
+          localStorage.setItem('cached_injections', JSON.stringify(formatted));
+        }
       }
     } catch (error) {
-      console.error('Error fetching injections:', error);
+      console.warn('Error fetching injections, using local cache:', error);
     }
   };
 
   const handleAddInjection = async (e) => {
     e.preventDefault();
     if (!injName || !injDate) return;
+
+    const tempId = Date.now().toString();
+    const newInj = {
+      id: tempId,
+      name: injName,
+      date: injDate,
+      status: 'Confirmed',
+      doctor: doctor || 'Dr. Alex River',
+      location: location || 'VIVA Medical Center',
+      notes: 'Scheduled immunization.'
+    };
+
+    const updatedList = [newInj, ...injections];
+    setInjections(updatedList);
+    localStorage.setItem('cached_injections', JSON.stringify(updatedList));
+
+    setIsAddModalOpen(false);
+    setInjName('');
+    setInjDate('');
+    setDoctor('');
+    setLocation('');
 
     const payload = {
       userId,
@@ -67,39 +97,30 @@ export default function Injections() {
 
       if (response.ok) {
         const savedInj = await response.json();
-
-        const newInj = {
-          id: savedInj._id,
-          name: savedInj.name,
-          date: savedInj.timing,
-          status: savedInj.status || 'Confirmed',
-          doctor: savedInj.doctor || payload.doctor,
-          location: savedInj.location || payload.location,
-          notes: savedInj.notes || payload.notes
-        };
-
-        setInjections([newInj, ...injections]);
-        setIsAddModalOpen(false);
-        setInjName('');
-        setInjDate('');
-        setDoctor('');
-        setLocation('');
+        setInjections(prev => {
+          const synced = prev.map(inj => inj.id === tempId ? { ...inj, id: savedInj._id } : inj);
+          localStorage.setItem('cached_injections', JSON.stringify(synced));
+          return synced;
+        });
       }
     } catch (error) {
-      console.error('Error adding injection:', error);
+      console.error('Error adding injection to server:', error);
     }
   };
 
-  const handleSaveReschedule = (e) => {
+  const handleSaveReschedule = async (e) => {
     e.preventDefault();
     if (!newDateVal || !activeReschedule) return;
 
-    setInjections(injections.map(inj => {
+    const updated = injections.map(inj => {
       if (inj.id === activeReschedule.id) {
         return { ...inj, date: newDateVal, status: 'Rescheduled' };
       }
       return inj;
-    }));
+    });
+
+    setInjections(updated);
+    localStorage.setItem('cached_injections', JSON.stringify(updated));
 
     setActiveReschedule(null);
     setNewDateVal('');
@@ -109,18 +130,19 @@ export default function Injections() {
     e.stopPropagation();
     if (!window.confirm('Are you sure you want to remove this vaccination record?')) return;
 
+    const updated = injections.filter(inj => inj.id !== id);
+    setInjections(updated);
+    localStorage.setItem('cached_injections', JSON.stringify(updated));
+
+    if (activeDetails && activeDetails.id === id) setActiveDetails(null);
+    if (activeReschedule && activeReschedule.id === id) setActiveReschedule(null);
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/injections/${id}`, {
+      await fetch(`${API_BASE_URL}/api/injections/${id}`, {
         method: 'DELETE'
       });
-
-      if (response.ok) {
-        setInjections(injections.filter(inj => inj.id !== id));
-        if (activeDetails && activeDetails.id === id) setActiveDetails(null);
-        if (activeReschedule && activeReschedule.id === id) setActiveReschedule(null);
-      }
     } catch (error) {
-      console.error('Error deleting injection:', error);
+      console.error('Error deleting injection on server:', error);
     }
   };
 
@@ -132,6 +154,7 @@ export default function Injections() {
           <p className="text-slate-500 text-sm mt-0.5">Manage and track your immunizations.</p>
         </div>
         <button 
+          type="button"
           onClick={() => setIsAddModalOpen(true)}
           className="bg-teal-800 hover:bg-teal-900 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-sm transition flex items-center gap-2 cursor-pointer"
         >
@@ -166,6 +189,7 @@ export default function Injections() {
                     {inj.status}
                   </span>
                   <button 
+                    type="button"
                     onClick={(e) => handleDelete(inj.id, e)}
                     className="text-slate-300 hover:text-rose-500 p-2 font-bold transition cursor-pointer"
                     title="Delete record"
@@ -177,12 +201,14 @@ export default function Injections() {
 
               <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
                 <button 
+                  type="button"
                   onClick={() => setActiveDetails(inj)}
                   className="bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-2xl font-medium text-sm transition shadow-xs cursor-pointer"
                 >
                   Details
                 </button>
                 <button 
+                  type="button"
                   onClick={() => setActiveReschedule(inj)}
                   className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2.5 rounded-2xl font-medium text-sm transition cursor-pointer"
                 >

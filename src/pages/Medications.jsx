@@ -2,7 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 
 export default function Medications() {
-  const [medications, setMedications] = useState([]);
+  // Read immediately from LocalStorage for instant load & offline resilience
+  const [medications, setMedications] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('cached_medications')) || [];
+    } catch {
+      return [];
+    }
+  });
+
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [medName, setMedName] = useState('');
   const [dosage, setDosage] = useState('');
@@ -19,27 +27,31 @@ export default function Medications() {
       const response = await fetch(`${API_BASE_URL}/api/medications/${userId}`);
       if (response.ok) {
         const data = await response.json();
-        const formattedData = data.map(item => {
-          const isTaken = item.status === 'Taken' || item.status === 'Completed';
-          
-          return {
-            id: item._id,
-            name: item.name,
-            dosage: item.dosage,
-            rawTiming: item.timing,
-            nextTiming: item.timing ? `Next: ${item.timing}` : 'Next: Scheduled daily',
-            takenTiming: isTaken ? `Taken: ${new Date(item.updatedAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ✓` : null,
-            isTaken: isTaken,
-            status: isTaken ? 'Taken' : 'Active',
-            statusColor: isTaken 
-              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-              : 'bg-slate-100 text-slate-600 border border-slate-200'
-          };
-        });
-        setMedications(formattedData);
+        if (Array.isArray(data) && data.length > 0) {
+          const formattedData = data.map(item => {
+            const isTaken = item.status === 'Taken' || item.status === 'Completed';
+            
+            return {
+              id: item._id,
+              name: item.name,
+              dosage: item.dosage,
+              rawTiming: item.timing,
+              nextTiming: item.timing ? `Next: ${item.timing}` : 'Next: Scheduled daily',
+              takenTiming: isTaken ? `Taken: ${new Date(item.updatedAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ✓` : null,
+              isTaken: isTaken,
+              status: isTaken ? 'Taken' : 'Active',
+              statusColor: isTaken 
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                : 'bg-slate-100 text-slate-600 border border-slate-200'
+            };
+          });
+
+          setMedications(formattedData);
+          localStorage.setItem('cached_medications', JSON.stringify(formattedData));
+        }
       }
     } catch (error) {
-      console.error('Error fetching medications:', error);
+      console.warn('Error fetching medications, using local cache:', error);
     }
   };
 
@@ -51,39 +63,35 @@ export default function Medications() {
 
     const nextIsTaken = !targetMed.isTaken;
     const nextStatus = nextIsTaken ? 'Taken' : 'Active';
+    const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const updatedMeds = medications.map(med => {
+      if (med.id === id) {
+        return {
+          ...med,
+          isTaken: nextIsTaken,
+          status: nextStatus,
+          statusColor: nextIsTaken 
+            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+            : 'bg-slate-100 text-slate-600 border border-slate-200',
+          takenTiming: nextIsTaken ? `Taken: ${currentTime} ✓` : null,
+          nextTiming: !nextIsTaken ? (med.rawTiming ? `Next: ${med.rawTiming}` : 'Next: Scheduled daily') : null
+        };
+      }
+      return med;
+    });
+
+    setMedications(updatedMeds);
+    localStorage.setItem('cached_medications', JSON.stringify(updatedMeds));
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/medications/${id}/toggle`, {
+      await fetch(`${API_BASE_URL}/api/medications/${id}/toggle`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: nextStatus })
       });
-
-      if (response.ok) {
-        const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        setMedications(prevMeds =>
-          prevMeds.map(med => {
-            if (med.id === id) {
-              return {
-                ...med,
-                isTaken: nextIsTaken,
-                status: nextStatus,
-                statusColor: nextIsTaken 
-                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                  : 'bg-slate-100 text-slate-600 border border-slate-200',
-                takenTiming: nextIsTaken ? `Taken: ${currentTime} ✓` : null,
-                nextTiming: !nextIsTaken ? (med.rawTiming ? `Next: ${med.rawTiming}` : 'Next: Scheduled daily') : null
-              };
-            }
-            return med;
-          })
-        );
-      } else {
-        alert("Failed to update medication status on server.");
-      }
     } catch (error) {
-      console.error('Error toggling medication status:', error);
+      console.error('Error toggling medication status on server:', error);
     }
   };
 
@@ -91,22 +99,44 @@ export default function Medications() {
     e.stopPropagation();
     if (!window.confirm('Are you sure you want to remove this medication from your schedule?')) return;
 
+    const updatedMeds = medications.filter(med => med.id !== id);
+    setMedications(updatedMeds);
+    localStorage.setItem('cached_medications', JSON.stringify(updatedMeds));
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/medications/${id}`, {
+      await fetch(`${API_BASE_URL}/api/medications/${id}`, {
         method: 'DELETE'
       });
-
-      if (response.ok) {
-        setMedications(prevMeds => prevMeds.filter(med => med.id !== id));
-      }
     } catch (error) {
-      console.error('Error deleting medication:', error);
+      console.error('Error deleting medication on server:', error);
     }
   };
 
   const handleAddMedication = async (e) => {
     e.preventDefault();
     if (!medName || !dosage) return;
+
+    const tempId = Date.now().toString();
+    const newMed = {
+      id: tempId,
+      name: medName,
+      dosage: dosage,
+      rawTiming: timing || 'Scheduled daily',
+      nextTiming: timing ? `Next: ${timing}` : 'Next: Scheduled daily',
+      takenTiming: null,
+      isTaken: false,
+      status: 'Active',
+      statusColor: 'bg-slate-100 text-slate-600 border border-slate-200'
+    };
+
+    const updatedMeds = [...medications, newMed];
+    setMedications(updatedMeds);
+    localStorage.setItem('cached_medications', JSON.stringify(updatedMeds));
+
+    setIsAddModalOpen(false);
+    setMedName('');
+    setDosage('');
+    setTiming('');
 
     const payload = {
       userId,
@@ -125,28 +155,14 @@ export default function Medications() {
 
       if (response.ok) {
         const savedItem = await response.json();
-        
-        const newMed = {
-          id: savedItem._id,
-          name: savedItem.name,
-          dosage: savedItem.dosage,
-          rawTiming: savedItem.timing,
-          nextTiming: timing ? `Next: ${timing}` : 'Next: Scheduled daily',
-          takenTiming: null,
-          isTaken: false,
-          status: 'Active',
-          statusColor: 'bg-slate-100 text-slate-600 border border-slate-200'
-        };
-
-        setMedications(prevMeds => [...prevMeds, newMed]);
-        setIsAddModalOpen(false);
-
-        setMedName('');
-        setDosage('');
-        setTiming('');
+        setMedications(prevMeds => {
+          const synced = prevMeds.map(m => m.id === tempId ? { ...m, id: savedItem._id } : m);
+          localStorage.setItem('cached_medications', JSON.stringify(synced));
+          return synced;
+        });
       }
     } catch (error) {
-      console.error('Error adding medication:', error);
+      console.error('Error adding medication to server:', error);
     }
   };
 

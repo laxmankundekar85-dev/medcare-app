@@ -4,19 +4,27 @@ import { API_BASE_URL } from '../config';
 export default function Profile({ onLogout }) {
   const fileInputRef = useRef(null);
 
-  // Read saved photo from localStorage first (Instant load on mobile & desktop)
   const savedLocalAvatar = localStorage.getItem('userAvatar');
 
-  const [profile, setProfile] = useState({
-    name: 'Laxman Babu Kundekar',
-    patientId: '#MC-98442',
-    bloodGroup: 'O+',
-    age: '20',
-    weight: '64',
-    email: 'laxman.kundekar@healthmail.com',
-    phone: '+91 9503883879',
-    address: 'VIVA Institute of Technology, Virar, Mumbai',
-    avatar: savedLocalAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
+  // Read immediately from LocalStorage cache for instant rendering
+  const [profile, setProfile] = useState(() => {
+    try {
+      const cached = JSON.parse(localStorage.getItem('user_profile_cache'));
+      if (cached) return cached;
+    } catch {
+      // Fallback if no JSON cache exists
+    }
+    return {
+      name: 'Laxman Babu Kundekar',
+      patientId: '#MC-98442',
+      bloodGroup: 'O+',
+      age: '20',
+      weight: '64',
+      email: 'laxman.kundekar@healthmail.com',
+      phone: '+91 9503883879',
+      address: 'VIVA Institute of Technology, Virar, Mumbai',
+      avatar: savedLocalAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
+    };
   });
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -53,19 +61,23 @@ export default function Profile({ onLogout }) {
       const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`);
       if (response.ok) {
         const data = await response.json();
-        setProfile(prev => ({
-          ...prev,
-          name: data.fullName || prev.name,
-          patientId: data.patientId || prev.patientId,
-          bloodGroup: data.bloodGroup || prev.bloodGroup,
-          weight: data.weight ? String(data.weight) : prev.weight,
-          email: data.email || prev.email,
-          phone: data.phone || prev.phone,
-          avatar: data.avatar || localStorage.getItem('userAvatar') || prev.avatar
-        }));
+        setProfile(prev => {
+          const updated = {
+            ...prev,
+            name: data.fullName || prev.name,
+            patientId: data.patientId || prev.patientId,
+            bloodGroup: data.bloodGroup || prev.bloodGroup,
+            weight: data.weight ? String(data.weight) : prev.weight,
+            email: data.email || prev.email,
+            phone: data.phone || prev.phone,
+            avatar: data.avatar || localStorage.getItem('userAvatar') || prev.avatar
+          };
+          localStorage.setItem('user_profile_cache', JSON.stringify(updated));
+          return updated;
+        });
       }
     } catch (error) {
-      console.error('Error fetching profile data:', error);
+      console.warn('Error fetching profile data, retaining cached values:', error);
     }
   };
 
@@ -84,6 +96,11 @@ export default function Profile({ onLogout }) {
 
     const updatedProfile = { ...profile, [editField]: editVal };
 
+    // Instant local save
+    setProfile(updatedProfile);
+    localStorage.setItem('user_profile_cache', JSON.stringify(updatedProfile));
+    setIsEditModalOpen(false);
+
     const payload = {
       fullName: updatedProfile.name,
       patientId: updatedProfile.patientId,
@@ -95,18 +112,13 @@ export default function Profile({ onLogout }) {
     };
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
+      await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-
-      if (response.ok) {
-        setProfile(updatedProfile);
-        setIsEditModalOpen(false);
-      }
     } catch (error) {
-      console.error('Error updating profile:', error);
+      console.error('Error updating profile on server:', error);
     }
   };
 
@@ -121,7 +133,6 @@ export default function Profile({ onLogout }) {
     reader.onload = (event) => {
       const img = new Image();
       img.onload = async () => {
-        // Resize and compress high-res mobile photos to 300x300
         const canvas = document.createElement('canvas');
         const MAX_WIDTH = 300;
         const MAX_HEIGHT = 300;
@@ -145,20 +156,20 @@ export default function Profile({ onLogout }) {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Convert to optimized JPEG Base64 data
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
 
-        // A. Save immediately to LocalStorage
         try {
           localStorage.setItem('userAvatar', compressedBase64);
         } catch (err) {
           console.warn('LocalStorage quota exceeded', err);
         }
 
-        // B. Update React State
-        setProfile(prev => ({ ...prev, avatar: compressedBase64 }));
+        setProfile(prev => {
+          const updated = { ...prev, avatar: compressedBase64 };
+          localStorage.setItem('user_profile_cache', JSON.stringify(updated));
+          return updated;
+        });
 
-        // C. Send to MongoDB API
         try {
           const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
             method: 'PUT',
@@ -185,7 +196,7 @@ export default function Profile({ onLogout }) {
     };
 
     reader.readAsDataURL(file);
-    e.target.value = null; // Clear input target for repeated uploads
+    e.target.value = null;
   };
 
   return (
@@ -210,7 +221,6 @@ export default function Profile({ onLogout }) {
         </div>
         
         <div className="absolute -bottom-10 left-1/2 transform -translate-x-1/2 flex flex-col items-center">
-          {/* Mobile-friendly click target */}
           <div 
             onClick={() => fileInputRef.current && fileInputRef.current.click()}
             className="relative group cursor-pointer"
@@ -223,7 +233,6 @@ export default function Profile({ onLogout }) {
               />
             </div>
             
-            {/* HIDDEN BY DEFAULT (opacity-0). Shows on hover (desktop) or active touch (mobile) */}
             <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-200 text-white text-[10px] font-semibold text-center px-1">
               📷 Change Photo
             </div>

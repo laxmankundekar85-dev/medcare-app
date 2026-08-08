@@ -2,9 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 
 export default function Settings({ onLogout }) {
-  const [account, setAccount] = useState({
-    name: 'Laxman Babu Kundekar',
-    role: 'Engineering Student & Patient'
+  // Read immediately from LocalStorage for instant load & offline resilience
+  const [account, setAccount] = useState(() => {
+    try {
+      const cached = JSON.parse(localStorage.getItem('user_settings_account'));
+      if (cached) return cached;
+    } catch {
+      // Fallback if no JSON cache exists
+    }
+    return {
+      name: 'Laxman Babu Kundekar',
+      role: 'Engineering Student & Patient'
+    };
   });
 
   const [activeModal, setActiveModal] = useState(null); // 'notifications', 'privacy', 'security', 'language', 'support', 'editAccount'
@@ -49,15 +58,19 @@ export default function Settings({ onLogout }) {
       if (response.ok) {
         const data = await response.json();
         if (data.fullName) {
-          setAccount(prev => ({
-            ...prev,
-            name: data.fullName
-          }));
+          setAccount(prev => {
+            const updated = {
+              ...prev,
+              name: data.fullName
+            };
+            localStorage.setItem('user_settings_account', JSON.stringify(updated));
+            return updated;
+          });
           setNewName(data.fullName);
         }
       }
     } catch (error) {
-      console.error('Error fetching settings profile:', error);
+      console.warn('Error fetching settings profile, using local cache:', error);
     }
   };
 
@@ -67,19 +80,21 @@ export default function Settings({ onLogout }) {
   const handleSaveAccount = async (e) => {
     e.preventDefault();
 
+    const updatedAccount = { name: newName, role: newRole };
+    
+    // Instant local save
+    setAccount(updatedAccount);
+    localStorage.setItem('user_settings_account', JSON.stringify(updatedAccount));
+    setActiveModal(null);
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
+      await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fullName: newName })
       });
-
-      if (response.ok) {
-        setAccount({ name: newName, role: newRole });
-        setActiveModal(null);
-      }
     } catch (error) {
-      console.error('Error updating account settings:', error);
+      console.error('Error updating account settings on server:', error);
     }
   };
 
