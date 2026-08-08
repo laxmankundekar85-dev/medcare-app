@@ -50,7 +50,7 @@ export default function Profile({ onLogout }) {
   });
 
   // ==========================================
-  // 1. FETCH PROFILE FROM BACKEND API
+  // 1. FETCH PROFILE & AVATAR FROM BACKEND API
   // ==========================================
   useEffect(() => {
     if (!userId || userId === 'guest_user') return;
@@ -63,6 +63,16 @@ export default function Profile({ onLogout }) {
       if (response.ok) {
         const data = await response.json();
         setProfile(prev => {
+          const updatedAvatar = data.avatar || localStorage.getItem(getCacheKey('userAvatar')) || prev.avatar;
+          
+          if (data.avatar) {
+            try {
+              localStorage.setItem(getCacheKey('userAvatar'), data.avatar);
+            } catch (e) {
+              console.warn('Quota exceeded saving avatar to cache', e);
+            }
+          }
+
           const updated = {
             ...prev,
             name: data.fullName || prev.name,
@@ -71,8 +81,9 @@ export default function Profile({ onLogout }) {
             weight: data.weight ? String(data.weight) : prev.weight,
             email: data.email || prev.email,
             phone: data.phone || prev.phone,
-            avatar: data.avatar || localStorage.getItem(getCacheKey('userAvatar')) || prev.avatar
+            avatar: updatedAvatar
           };
+          
           localStorage.setItem(getCacheKey('user_profile_cache'), JSON.stringify(updated));
           return updated;
         });
