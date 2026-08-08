@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { User, Activity, FileText, ChevronRight, Plus } from 'lucide-react';
+import { User, Activity, FileText, ChevronRight, Plus, Bot, Sparkles } from 'lucide-react';
 import { StatCard } from '../components/ui/Cards';
 import { API_BASE_URL } from '../config';
 import { getUserId, getCacheKey } from '../utils/user';
 
-export default function Dashboard() {
+export default function Dashboard({ onNavigate }) {
   const userId = getUserId();
 
   // Read immediately from LocalStorage for instant load & offline resilience (User Scoped)
@@ -212,6 +212,12 @@ export default function Dashboard() {
     }
   };
 
+  const handleOpenChatbot = () => {
+    if (onNavigate) {
+      onNavigate('chatbot');
+    }
+  };
+
   return (
     <div className="space-y-6 pb-24 relative font-sans" onClick={() => setIsFabMenuOpen(false)}>
       {/* Top Banner Card */}
@@ -310,7 +316,24 @@ export default function Dashboard() {
         </button>
       </div>
 
-      <div className="fixed bottom-24 right-6 z-50" onClick={(e) => e.stopPropagation()}>
+      {/* Floating Fast-Access Controls (Bottom Right) */}
+      <div className="fixed bottom-24 right-6 z-50 flex flex-col items-end gap-3" onClick={(e) => e.stopPropagation()}>
+        {/* Fast Access AI Chatbot Floating Button */}
+        <button
+          type="button"
+          onClick={handleOpenChatbot}
+          title="Open Medcare AI Assistant"
+          className="relative w-14 h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center shadow-xl transition transform hover:scale-110 active:scale-95 cursor-pointer group border-2 border-white"
+        >
+          <Bot size={26} className="group-hover:rotate-12 transition-transform duration-200" />
+          <Sparkles size={14} className="absolute top-1 right-1 text-amber-300 animate-pulse" />
+          <span className="absolute top-0 right-0 flex h-3.5 w-3.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500 border-2 border-white"></span>
+          </span>
+        </button>
+
+        {/* Quick Action FAB Menu */}
         {isFabMenuOpen && (
           <div className="absolute bottom-16 right-0 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 w-52 space-y-1 mb-2">
             <button 

@@ -268,7 +268,7 @@ export default function MedcareApp() {
 
       {/* Main Content Area */}
       <main className="p-4">
-        {currentView === 'dashboard' && <Dashboard />}
+        {currentView === 'dashboard' && <Dashboard onNavigate={navigateTo} />}
         {currentView === 'chatbot' && <Chatbot />}
         {currentView === 'appointments' && <Appointments />}
         {currentView === 'alarms' && <Alarms />}
