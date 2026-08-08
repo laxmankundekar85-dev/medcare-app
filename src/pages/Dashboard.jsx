@@ -2,21 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { User, Activity, FileText, ChevronRight, Plus } from 'lucide-react';
 import { StatCard } from '../components/ui/Cards';
 import { API_BASE_URL } from '../config';
+import { getUserId, getCacheKey } from '../utils/user';
 
 export default function Dashboard() {
-  // Read immediately from LocalStorage for instant load & offline resilience
+  const userId = getUserId();
+
+  // Read immediately from LocalStorage for instant load & offline resilience (User Scoped)
   const [weight, setWeight] = useState(() => {
-    return Number(localStorage.getItem('userWeight')) || 60;
+    return Number(localStorage.getItem(getCacheKey('userWeight'))) || 60;
   });
   const [height, setHeight] = useState(() => {
-    return Number(localStorage.getItem('userHeight')) || 181;
+    return Number(localStorage.getItem(getCacheKey('userHeight'))) || 181;
   });
 
   const [patientName, setPatientName] = useState(() => {
-    return localStorage.getItem('patientName') || 'Laxman';
+    try {
+      const u = JSON.parse(localStorage.getItem('user'));
+      return localStorage.getItem(getCacheKey('patientName')) || u?.displayName || 'Patient';
+    } catch {
+      return 'Patient';
+    }
   });
   const [patientId, setPatientId] = useState(() => {
-    return localStorage.getItem('patientId') || '#MC8829';
+    return localStorage.getItem(getCacheKey('patientId')) || '#MC8829';
   });
 
   const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
@@ -29,7 +37,7 @@ export default function Dashboard() {
 
   const [medications, setMedications] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('cached_medications')) || [];
+      return JSON.parse(localStorage.getItem(getCacheKey('cached_medications'))) || [];
     } catch {
       return [];
     }
@@ -37,7 +45,7 @@ export default function Dashboard() {
 
   const [appointments, setAppointments] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('cached_appointments')) || [];
+      return JSON.parse(localStorage.getItem(getCacheKey('cached_appointments'))) || [];
     } catch {
       return [];
     }
@@ -45,7 +53,7 @@ export default function Dashboard() {
 
   const [alarms, setAlarms] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('cached_alarms')) || [];
+      return JSON.parse(localStorage.getItem(getCacheKey('cached_alarms'))) || [];
     } catch {
       return [];
     }
@@ -53,7 +61,7 @@ export default function Dashboard() {
 
   const [injections, setInjections] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('cached_injections')) || [];
+      return JSON.parse(localStorage.getItem(getCacheKey('cached_injections'))) || [];
     } catch {
       return [];
     }
@@ -61,9 +69,8 @@ export default function Dashboard() {
 
   const [loading, setLoading] = useState(true);
 
-  const userId = "sample_firebase_user_id";
-
   useEffect(() => {
+    if (!userId || userId === 'guest_user') return;
     fetchDashboardData();
     fetchUserProfile();
   }, [userId]);
@@ -75,21 +82,21 @@ export default function Dashboard() {
         const data = await res.json();
         if (data.weight) {
           setWeight(Number(data.weight));
-          localStorage.setItem('userWeight', String(data.weight));
+          localStorage.setItem(getCacheKey('userWeight'), String(data.weight));
         }
         if (data.height) {
           setHeight(Number(data.height));
-          localStorage.setItem('userHeight', String(data.height));
+          localStorage.setItem(getCacheKey('userHeight'), String(data.height));
         }
         if (data.fullName) {
           setPatientName(data.fullName);
           setTempName(data.fullName);
-          localStorage.setItem('patientName', data.fullName);
+          localStorage.setItem(getCacheKey('patientName'), data.fullName);
         }
         if (data.patientId) {
           setPatientId(data.patientId);
           setTempId(data.patientId);
-          localStorage.setItem('patientId', data.patientId);
+          localStorage.setItem(getCacheKey('patientId'), data.patientId);
         }
       }
     } catch (error) {
@@ -109,22 +116,22 @@ export default function Dashboard() {
       if (medRes.ok) {
         const medData = await medRes.json();
         setMedications(medData);
-        localStorage.setItem('cached_medications', JSON.stringify(medData));
+        localStorage.setItem(getCacheKey('cached_medications'), JSON.stringify(medData));
       }
       if (apptRes.ok) {
         const apptData = await apptRes.json();
         setAppointments(apptData);
-        localStorage.setItem('cached_appointments', JSON.stringify(apptData));
+        localStorage.setItem(getCacheKey('cached_appointments'), JSON.stringify(apptData));
       }
       if (alarmRes.ok) {
         const alarmData = await alarmRes.json();
         setAlarms(alarmData);
-        localStorage.setItem('cached_alarms', JSON.stringify(alarmData));
+        localStorage.setItem(getCacheKey('cached_alarms'), JSON.stringify(alarmData));
       }
       if (injRes.ok) {
         const injData = await injRes.json();
         setInjections(injData);
-        localStorage.setItem('cached_injections', JSON.stringify(injData));
+        localStorage.setItem(getCacheKey('cached_injections'), JSON.stringify(injData));
       }
     } catch (error) {
       console.warn('Error loading dashboard metrics, using local cache:', error);
@@ -159,8 +166,8 @@ export default function Dashboard() {
   const handleSaveVitals = async (e) => {
     if (e) e.preventDefault();
 
-    localStorage.setItem('userWeight', String(weight));
-    localStorage.setItem('userHeight', String(height));
+    localStorage.setItem(getCacheKey('userWeight'), String(weight));
+    localStorage.setItem(getCacheKey('userHeight'), String(height));
     setIsVitalsModalOpen(false);
 
     try {
@@ -185,8 +192,8 @@ export default function Dashboard() {
 
     setPatientName(tempName);
     setPatientId(tempId);
-    localStorage.setItem('patientName', tempName);
-    localStorage.setItem('patientId', tempId);
+    localStorage.setItem(getCacheKey('patientName'), tempName);
+    localStorage.setItem(getCacheKey('patientId'), tempId);
     setIsProfileModalOpen(false);
 
     try {

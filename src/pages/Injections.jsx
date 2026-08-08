@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
+import { getUserId, getCacheKey } from '../utils/user';
 
 export default function Injections() {
-  // Read immediately from LocalStorage for instant load & offline resilience
+  const userId = getUserId();
+
+  // Read immediately from LocalStorage for instant load & offline resilience (User Scoped)
   const [injections, setInjections] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('cached_injections')) || [];
+      return JSON.parse(localStorage.getItem(getCacheKey('cached_injections'))) || [];
     } catch {
       return [];
     }
@@ -21,9 +24,8 @@ export default function Injections() {
   const [location, setLocation] = useState('');
   const [newDateVal, setNewDateVal] = useState('');
 
-  const userId = "sample_firebase_user_id";
-
   useEffect(() => {
+    if (!userId || userId === 'guest_user') return;
     fetchInjections();
   }, [userId]);
 
@@ -44,7 +46,7 @@ export default function Injections() {
           }));
 
           setInjections(formatted);
-          localStorage.setItem('cached_injections', JSON.stringify(formatted));
+          localStorage.setItem(getCacheKey('cached_injections'), JSON.stringify(formatted));
         }
       }
     } catch (error) {
@@ -69,7 +71,7 @@ export default function Injections() {
 
     const updatedList = [newInj, ...injections];
     setInjections(updatedList);
-    localStorage.setItem('cached_injections', JSON.stringify(updatedList));
+    localStorage.setItem(getCacheKey('cached_injections'), JSON.stringify(updatedList));
 
     setIsAddModalOpen(false);
     setInjName('');
@@ -99,7 +101,7 @@ export default function Injections() {
         const savedInj = await response.json();
         setInjections(prev => {
           const synced = prev.map(inj => inj.id === tempId ? { ...inj, id: savedInj._id } : inj);
-          localStorage.setItem('cached_injections', JSON.stringify(synced));
+          localStorage.setItem(getCacheKey('cached_injections'), JSON.stringify(synced));
           return synced;
         });
       }
@@ -120,7 +122,7 @@ export default function Injections() {
     });
 
     setInjections(updated);
-    localStorage.setItem('cached_injections', JSON.stringify(updated));
+    localStorage.setItem(getCacheKey('cached_injections'), JSON.stringify(updated));
 
     setActiveReschedule(null);
     setNewDateVal('');
@@ -132,7 +134,7 @@ export default function Injections() {
 
     const updated = injections.filter(inj => inj.id !== id);
     setInjections(updated);
-    localStorage.setItem('cached_injections', JSON.stringify(updated));
+    localStorage.setItem(getCacheKey('cached_injections'), JSON.stringify(updated));
 
     if (activeDetails && activeDetails.id === id) setActiveDetails(null);
     if (activeReschedule && activeReschedule.id === id) setActiveReschedule(null);

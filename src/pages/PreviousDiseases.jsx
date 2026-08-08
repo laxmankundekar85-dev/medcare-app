@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
+import { getUserId, getCacheKey } from '../utils/user';
 
 export default function PreviousDiseases() {
-  // Read immediately from LocalStorage for instant load & offline resilience
+  const userId = getUserId();
+
+  // Read immediately from LocalStorage for instant load & offline resilience (User Scoped)
   const [diseases, setDiseases] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('cached_previous_diseases')) || [];
+      return JSON.parse(localStorage.getItem(getCacheKey('cached_previous_diseases'))) || [];
     } catch {
       return [];
     }
@@ -21,9 +24,8 @@ export default function PreviousDiseases() {
   const [doctorName, setDoctorName] = useState('');
   const [notes, setNotes] = useState('');
 
-  const userId = "sample_firebase_user_id";
-
   useEffect(() => {
+    if (!userId || userId === 'guest_user') return;
     fetchDiseases();
   }, [userId]);
 
@@ -44,7 +46,7 @@ export default function PreviousDiseases() {
           }));
 
           setDiseases(formatted);
-          localStorage.setItem('cached_previous_diseases', JSON.stringify(formatted));
+          localStorage.setItem(getCacheKey('cached_previous_diseases'), JSON.stringify(formatted));
         }
       }
     } catch (error) {
@@ -73,7 +75,7 @@ export default function PreviousDiseases() {
 
     const updatedList = [newDisease, ...diseases];
     setDiseases(updatedList);
-    localStorage.setItem('cached_previous_diseases', JSON.stringify(updatedList));
+    localStorage.setItem(getCacheKey('cached_previous_diseases'), JSON.stringify(updatedList));
 
     setIsModalOpen(false);
     setConditionName('');
@@ -103,7 +105,7 @@ export default function PreviousDiseases() {
         const saved = await response.json();
         setDiseases(prev => {
           const synced = prev.map(d => d.id === tempId ? { ...d, id: saved._id } : d);
-          localStorage.setItem('cached_previous_diseases', JSON.stringify(synced));
+          localStorage.setItem(getCacheKey('cached_previous_diseases'), JSON.stringify(synced));
           return synced;
         });
       }
@@ -118,7 +120,7 @@ export default function PreviousDiseases() {
 
     const updatedList = diseases.filter(d => d.id !== id);
     setDiseases(updatedList);
-    localStorage.setItem('cached_previous_diseases', JSON.stringify(updatedList));
+    localStorage.setItem(getCacheKey('cached_previous_diseases'), JSON.stringify(updatedList));
 
     if (activeDetails && activeDetails.id === id) {
       setActiveDetails(null);

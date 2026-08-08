@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../config';
+import { getUserId, getCacheKey } from '../utils/user';
 
 export default function Alarms() {
+  const userId = getUserId();
+
   // Read immediately from LocalStorage for instant load and offline resilience
   const [reminders, setReminders] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('cached_alarms')) || [];
+      return JSON.parse(localStorage.getItem(getCacheKey('cached_alarms'))) || [];
     } catch {
       return [];
     }
@@ -24,8 +27,6 @@ export default function Alarms() {
   const alarmSoundIntervalRef = useRef(null);
   const autoStopTimeoutRef = useRef(null);
 
-  const userId = "sample_firebase_user_id";
-
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
@@ -39,6 +40,7 @@ export default function Alarms() {
   }, []);
 
   useEffect(() => {
+    if (!userId || userId === 'guest_user') return;
     fetchAlarms();
   }, [userId]);
 
@@ -66,7 +68,7 @@ export default function Alarms() {
           });
 
           setReminders(formatted);
-          localStorage.setItem('cached_alarms', JSON.stringify(formatted));
+          localStorage.setItem(getCacheKey('cached_alarms'), JSON.stringify(formatted));
         }
       }
     } catch (error) {
@@ -191,7 +193,7 @@ export default function Alarms() {
       rem.id === id ? { ...rem, active: !rem.active } : rem
     );
     setReminders(updated);
-    localStorage.setItem('cached_alarms', JSON.stringify(updated));
+    localStorage.setItem(getCacheKey('cached_alarms'), JSON.stringify(updated));
 
     setTriggeredIds(prev => {
       const next = new Set(prev);
@@ -213,7 +215,7 @@ export default function Alarms() {
 
     const updated = reminders.filter(rem => rem.id !== id);
     setReminders(updated);
-    localStorage.setItem('cached_alarms', JSON.stringify(updated));
+    localStorage.setItem(getCacheKey('cached_alarms'), JSON.stringify(updated));
 
     try {
       await fetch(`${API_BASE_URL}/api/alarms/${id}`, {
@@ -248,7 +250,7 @@ export default function Alarms() {
 
     const updatedList = [...reminders, newReminder];
     setReminders(updatedList);
-    localStorage.setItem('cached_alarms', JSON.stringify(updatedList));
+    localStorage.setItem(getCacheKey('cached_alarms'), JSON.stringify(updatedList));
 
     setReminderLabel('');
     setIsModalOpen(false);
@@ -271,10 +273,9 @@ export default function Alarms() {
 
       if (response.ok) {
         const savedAlarm = await response.json();
-        // Sync generated MongoDB ID into state & cache
         setReminders(prev => {
           const synced = prev.map(r => r.id === tempId ? { ...r, id: savedAlarm._id } : r);
-          localStorage.setItem('cached_alarms', JSON.stringify(synced));
+          localStorage.setItem(getCacheKey('cached_alarms'), JSON.stringify(synced));
           return synced;
         });
       }

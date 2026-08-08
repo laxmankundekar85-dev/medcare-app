@@ -1,22 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
+import { getUserId, getCacheKey } from '../utils/user';
 
 export default function PatientProfile() {
-  // Read immediately from LocalStorage for instant load & offline resilience
+  const userId = getUserId();
+
+  // Read immediately from LocalStorage for instant load & offline resilience (User Scoped)
   const [patientName, setPatientName] = useState(() => {
-    return localStorage.getItem('patientName') || 'Laxman Babu Kundekar';
+    try {
+      const u = JSON.parse(localStorage.getItem('user'));
+      return localStorage.getItem(getCacheKey('patientName')) || u?.displayName || 'Patient Name';
+    } catch {
+      return 'Patient Name';
+    }
   });
+
   const [patientId, setPatientId] = useState(() => {
-    return localStorage.getItem('patientId') || '#MC8829';
+    return localStorage.getItem(getCacheKey('patientId')) || '#MC8829';
   });
 
   const [isEditing, setIsEditing] = useState(false);
   const [tempName, setTempName] = useState(patientName);
   const [tempId, setTempId] = useState(patientId);
 
-  const userId = "sample_firebase_user_id";
-
   useEffect(() => {
+    if (!userId || userId === 'guest_user') return;
     fetchProfile();
   }, [userId]);
 
@@ -28,12 +36,12 @@ export default function PatientProfile() {
         if (data.fullName) {
           setPatientName(data.fullName);
           setTempName(data.fullName);
-          localStorage.setItem('patientName', data.fullName);
+          localStorage.setItem(getCacheKey('patientName'), data.fullName);
         }
         if (data.patientId) {
           setPatientId(data.patientId);
           setTempId(data.patientId);
-          localStorage.setItem('patientId', data.patientId);
+          localStorage.setItem(getCacheKey('patientId'), data.patientId);
         }
       }
     } catch (error) {
@@ -45,11 +53,11 @@ export default function PatientProfile() {
     e.preventDefault();
     if (!tempName || !tempId) return;
 
-    // Instant local save
+    // Instant local save (User Scoped)
     setPatientName(tempName);
     setPatientId(tempId);
-    localStorage.setItem('patientName', tempName);
-    localStorage.setItem('patientId', tempId);
+    localStorage.setItem(getCacheKey('patientName'), tempName);
+    localStorage.setItem(getCacheKey('patientId'), tempId);
     setIsEditing(false);
 
     try {

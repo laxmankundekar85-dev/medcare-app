@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
+import { getUserId, getCacheKey } from '../utils/user';
 
 export default function Medications() {
-  // Read immediately from LocalStorage for instant load & offline resilience
+  const userId = getUserId();
+
   const [medications, setMedications] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('cached_medications')) || [];
+      return JSON.parse(localStorage.getItem(getCacheKey('cached_medications'))) || [];
     } catch {
       return [];
     }
@@ -16,9 +18,8 @@ export default function Medications() {
   const [dosage, setDosage] = useState('');
   const [timing, setTiming] = useState('');
 
-  const userId = "sample_firebase_user_id"; 
-
   useEffect(() => {
+    if (!userId || userId === 'guest_user') return;
     fetchMedications();
   }, [userId]);
 
@@ -27,10 +28,9 @@ export default function Medications() {
       const response = await fetch(`${API_BASE_URL}/api/medications/${userId}`);
       if (response.ok) {
         const data = await response.json();
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           const formattedData = data.map(item => {
             const isTaken = item.status === 'Taken' || item.status === 'Completed';
-            
             return {
               id: item._id,
               name: item.name,
@@ -47,7 +47,7 @@ export default function Medications() {
           });
 
           setMedications(formattedData);
-          localStorage.setItem('cached_medications', JSON.stringify(formattedData));
+          localStorage.setItem(getCacheKey('cached_medications'), JSON.stringify(formattedData));
         }
       }
     } catch (error) {
@@ -82,7 +82,7 @@ export default function Medications() {
     });
 
     setMedications(updatedMeds);
-    localStorage.setItem('cached_medications', JSON.stringify(updatedMeds));
+    localStorage.setItem(getCacheKey('cached_medications'), JSON.stringify(updatedMeds));
 
     try {
       await fetch(`${API_BASE_URL}/api/medications/${id}/toggle`, {
@@ -101,7 +101,7 @@ export default function Medications() {
 
     const updatedMeds = medications.filter(med => med.id !== id);
     setMedications(updatedMeds);
-    localStorage.setItem('cached_medications', JSON.stringify(updatedMeds));
+    localStorage.setItem(getCacheKey('cached_medications'), JSON.stringify(updatedMeds));
 
     try {
       await fetch(`${API_BASE_URL}/api/medications/${id}`, {
@@ -131,7 +131,7 @@ export default function Medications() {
 
     const updatedMeds = [...medications, newMed];
     setMedications(updatedMeds);
-    localStorage.setItem('cached_medications', JSON.stringify(updatedMeds));
+    localStorage.setItem(getCacheKey('cached_medications'), JSON.stringify(updatedMeds));
 
     setIsAddModalOpen(false);
     setMedName('');
@@ -157,7 +157,7 @@ export default function Medications() {
         const savedItem = await response.json();
         setMedications(prevMeds => {
           const synced = prevMeds.map(m => m.id === tempId ? { ...m, id: savedItem._id } : m);
-          localStorage.setItem('cached_medications', JSON.stringify(synced));
+          localStorage.setItem(getCacheKey('cached_medications'), JSON.stringify(synced));
           return synced;
         });
       }

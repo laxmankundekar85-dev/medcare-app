@@ -1,28 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../config';
+import { getUserId, getCacheKey } from '../utils/user';
 
 export default function Profile({ onLogout }) {
   const fileInputRef = useRef(null);
+  const userId = getUserId();
 
-  const savedLocalAvatar = localStorage.getItem('userAvatar');
+  const savedLocalAvatar = localStorage.getItem(getCacheKey('userAvatar'));
 
-  // Read immediately from LocalStorage cache for instant rendering
+  // Read immediately from LocalStorage cache for instant rendering (User Scoped)
   const [profile, setProfile] = useState(() => {
     try {
-      const cached = JSON.parse(localStorage.getItem('user_profile_cache'));
+      const cached = JSON.parse(localStorage.getItem(getCacheKey('user_profile_cache')));
       if (cached) return cached;
     } catch {
       // Fallback if no JSON cache exists
     }
     return {
-      name: 'Laxman Babu Kundekar',
+      name: 'Patient Name',
       patientId: '#MC-98442',
       bloodGroup: 'O+',
       age: '20',
       weight: '64',
-      email: 'laxman.kundekar@healthmail.com',
+      email: 'patient@healthmail.com',
       phone: '+91 9503883879',
-      address: 'VIVA Institute of Technology, Virar, Mumbai',
+      address: 'Mumbai, India',
       avatar: savedLocalAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
     };
   });
@@ -47,12 +49,11 @@ export default function Profile({ onLogout }) {
     twoFactor: true
   });
 
-  const userId = "sample_firebase_user_id";
-
   // ==========================================
   // 1. FETCH PROFILE FROM BACKEND API
   // ==========================================
   useEffect(() => {
+    if (!userId || userId === 'guest_user') return;
     fetchProfile();
   }, [userId]);
 
@@ -70,9 +71,9 @@ export default function Profile({ onLogout }) {
             weight: data.weight ? String(data.weight) : prev.weight,
             email: data.email || prev.email,
             phone: data.phone || prev.phone,
-            avatar: data.avatar || localStorage.getItem('userAvatar') || prev.avatar
+            avatar: data.avatar || localStorage.getItem(getCacheKey('userAvatar')) || prev.avatar
           };
-          localStorage.setItem('user_profile_cache', JSON.stringify(updated));
+          localStorage.setItem(getCacheKey('user_profile_cache'), JSON.stringify(updated));
           return updated;
         });
       }
@@ -98,7 +99,7 @@ export default function Profile({ onLogout }) {
 
     // Instant local save
     setProfile(updatedProfile);
-    localStorage.setItem('user_profile_cache', JSON.stringify(updatedProfile));
+    localStorage.setItem(getCacheKey('user_profile_cache'), JSON.stringify(updatedProfile));
     setIsEditModalOpen(false);
 
     const payload = {
@@ -159,14 +160,14 @@ export default function Profile({ onLogout }) {
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
 
         try {
-          localStorage.setItem('userAvatar', compressedBase64);
+          localStorage.setItem(getCacheKey('userAvatar'), compressedBase64);
         } catch (err) {
           console.warn('LocalStorage quota exceeded', err);
         }
 
         setProfile(prev => {
           const updated = { ...prev, avatar: compressedBase64 };
-          localStorage.setItem('user_profile_cache', JSON.stringify(updated));
+          localStorage.setItem(getCacheKey('user_profile_cache'), JSON.stringify(updated));
           return updated;
         });
 
@@ -555,7 +556,7 @@ export default function Profile({ onLogout }) {
             <button
               type="button"
               onClick={() => setActiveSubView(null)}
-              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium transition text-sm cursor-pointer"
+              className="w-full bg-teal-800 hover:bg-teal-900 text-white py-2.5 rounded-xl font-medium text-sm cursor-pointer"
             >
               Close
             </button>

@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../config';
+import { getUserId, getCacheKey } from '../utils/user';
 
 export default function Records() {
-  // Read immediately from LocalStorage for instant load & offline resilience
+  const userId = getUserId();
+
+  // Read immediately from LocalStorage for instant load & offline resilience (User Scoped)
   const [records, setRecords] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('cached_clinical_records')) || [];
+      return JSON.parse(localStorage.getItem(getCacheKey('cached_clinical_records'))) || [];
     } catch {
       return [];
     }
@@ -28,9 +31,6 @@ export default function Records() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileDataUrl, setFileDataUrl] = useState(null);
 
-  // Dynamic Firebase Auth UID or user identifier
-  const userId = "sample_firebase_user_id";
-
   // Reference for hidden native file picker
   const fileInputRef = useRef(null);
 
@@ -46,6 +46,7 @@ export default function Records() {
   // 1. FETCH RECORDS FROM API
   // ==========================================
   useEffect(() => {
+    if (!userId || userId === 'guest_user') return;
     fetchRecords();
   }, [userId]);
 
@@ -76,7 +77,7 @@ export default function Records() {
           });
 
           setRecords(formatted);
-          localStorage.setItem('cached_clinical_records', JSON.stringify(formatted));
+          localStorage.setItem(getCacheKey('cached_clinical_records'), JSON.stringify(formatted));
         }
       }
     } catch (error) {
@@ -128,7 +129,7 @@ export default function Records() {
 
     const updatedList = [newRecord, ...records];
     setRecords(updatedList);
-    localStorage.setItem('cached_clinical_records', JSON.stringify(updatedList));
+    localStorage.setItem(getCacheKey('cached_clinical_records'), JSON.stringify(updatedList));
 
     setTitle('');
     setLocation('');
@@ -157,7 +158,7 @@ export default function Records() {
         const savedRecord = await response.json();
         setRecords(prev => {
           const synced = prev.map(r => r.id === tempId ? { ...r, id: savedRecord._id } : r);
-          localStorage.setItem('cached_clinical_records', JSON.stringify(synced));
+          localStorage.setItem(getCacheKey('cached_clinical_records'), JSON.stringify(synced));
           return synced;
         });
       }
@@ -174,7 +175,7 @@ export default function Records() {
 
     const updatedList = records.filter(r => r.id !== id);
     setRecords(updatedList);
-    localStorage.setItem('cached_clinical_records', JSON.stringify(updatedList));
+    localStorage.setItem(getCacheKey('cached_clinical_records'), JSON.stringify(updatedList));
     setActiveMenuId(null);
 
     try {

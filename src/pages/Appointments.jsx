@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
+import { getUserId, getCacheKey } from '../utils/user';
 
 export default function Appointments() {
+  const userId = getUserId();
   const [selectedDate, setSelectedDate] = useState('Mon 12');
 
   // Read immediately from LocalStorage for instant load & offline resilience
   const [upcoming, setUpcoming] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('cached_appointments')) || [];
+      return JSON.parse(localStorage.getItem(getCacheKey('cached_appointments'))) || [];
     } catch {
       return [];
     }
@@ -48,9 +50,8 @@ export default function Appointments() {
 
   const [activeSummary, setActiveSummary] = useState(null);
 
-  const userId = "sample_firebase_user_id";
-
   useEffect(() => {
+    if (!userId || userId === 'guest_user') return;
     fetchAppointments();
   }, [userId]);
 
@@ -69,7 +70,7 @@ export default function Appointments() {
             status: item.status || 'Confirmed'
           }));
           setUpcoming(formatted);
-          localStorage.setItem('cached_appointments', JSON.stringify(formatted));
+          localStorage.setItem(getCacheKey('cached_appointments'), JSON.stringify(formatted));
         }
       }
     } catch (error) {
@@ -82,7 +83,7 @@ export default function Appointments() {
 
     const updated = upcoming.filter(app => app.id !== id);
     setUpcoming(updated);
-    localStorage.setItem('cached_appointments', JSON.stringify(updated));
+    localStorage.setItem(getCacheKey('cached_appointments'), JSON.stringify(updated));
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/appointments/${id}`, {
@@ -100,13 +101,25 @@ export default function Appointments() {
   const handleReschedule = async (id) => {
     const newDate = prompt('Enter new date (e.g., Aug 20, 2026):');
     const newTime = prompt('Enter new time (e.g., 11:00 AM):');
-    if (newDate && newTime) {
-      const updated = upcoming.map(app => 
-        app.id === id ? { ...app, date: newDate, time: newTime } : app
-      );
-      setUpcoming(updated);
-      localStorage.setItem('cached_appointments', JSON.stringify(updated));
+
+    if (!newDate || !newTime) return;
+
+    const updated = upcoming.map(app => 
+      app.id === id ? { ...app, date: newDate, time: newTime } : app
+    );
+
+    setUpcoming(updated);
+    localStorage.setItem(getCacheKey('cached_appointments'), JSON.stringify(updated));
+
+    try {
+      await fetch(`${API_BASE_URL}/api/appointments/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: newDate, time: newTime })
+      });
       alert('Appointment rescheduled successfully!');
+    } catch (error) {
+      console.error('Error rescheduling appointment on server:', error);
     }
   };
 
@@ -126,7 +139,7 @@ export default function Appointments() {
 
     const updatedList = [newApp, ...upcoming];
     setUpcoming(updatedList);
-    localStorage.setItem('cached_appointments', JSON.stringify(updatedList));
+    localStorage.setItem(getCacheKey('cached_appointments'), JSON.stringify(updatedList));
 
     setDocName('');
     setSpecialty('');
@@ -154,7 +167,7 @@ export default function Appointments() {
         const savedAppt = await response.json();
         setUpcoming(prev => {
           const synced = prev.map(a => a.id === tempId ? { ...a, id: savedAppt._id } : a);
-          localStorage.setItem('cached_appointments', JSON.stringify(synced));
+          localStorage.setItem(getCacheKey('cached_appointments'), JSON.stringify(synced));
           return synced;
         });
       }

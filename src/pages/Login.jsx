@@ -76,7 +76,7 @@ export default function Login({ onLogin }) {
         localStorage.setItem('user', JSON.stringify({
           uid: user.uid,
           email: user.email,
-          displayName: user.displayName || 'User'
+          displayName: user.displayName || email.split('@')[0]
         }));
 
         onLogin();
@@ -191,7 +191,7 @@ export default function Login({ onLogin }) {
       localStorage.setItem('user', JSON.stringify({
         uid: user.uid,
         email: user.email,
-        displayName: user.displayName
+        displayName: user.displayName || user.email.split('@')[0]
       }));
 
       onLogin();

@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
+import { getUserId, getCacheKey } from '../utils/user';
 
 export default function Settings({ onLogout }) {
-  // Read immediately from LocalStorage for instant load & offline resilience
+  const userId = getUserId();
+
+  // Read immediately from LocalStorage for instant load & offline resilience (User Scoped)
   const [account, setAccount] = useState(() => {
     try {
-      const cached = JSON.parse(localStorage.getItem('user_settings_account'));
+      const cached = JSON.parse(localStorage.getItem(getCacheKey('user_settings_account')));
       if (cached) return cached;
     } catch {
       // Fallback if no JSON cache exists
     }
     return {
-      name: 'Laxman Babu Kundekar',
+      name: 'Patient Name',
       role: 'Engineering Student & Patient'
     };
   });
@@ -42,13 +45,11 @@ export default function Settings({ onLogout }) {
   const [newName, setNewName] = useState(account.name);
   const [newRole, setNewRole] = useState(account.role);
 
-  // Dynamic Firebase Auth UID or user identifier
-  const userId = "sample_firebase_user_id";
-
   // ==========================================
   // 1. FETCH PROFILE DATA FROM API
   // ==========================================
   useEffect(() => {
+    if (!userId || userId === 'guest_user') return;
     fetchProfile();
   }, [userId]);
 
@@ -63,7 +64,7 @@ export default function Settings({ onLogout }) {
               ...prev,
               name: data.fullName
             };
-            localStorage.setItem('user_settings_account', JSON.stringify(updated));
+            localStorage.setItem(getCacheKey('user_settings_account'), JSON.stringify(updated));
             return updated;
           });
           setNewName(data.fullName);
@@ -82,9 +83,9 @@ export default function Settings({ onLogout }) {
 
     const updatedAccount = { name: newName, role: newRole };
     
-    // Instant local save
+    // Instant local save (User Scoped)
     setAccount(updatedAccount);
-    localStorage.setItem('user_settings_account', JSON.stringify(updatedAccount));
+    localStorage.setItem(getCacheKey('user_settings_account'), JSON.stringify(updatedAccount));
     setActiveModal(null);
 
     try {
