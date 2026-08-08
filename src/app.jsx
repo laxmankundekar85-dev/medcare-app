@@ -20,6 +20,8 @@ import Appointments from './pages/Appointments';
 import Alarms from './pages/Alarms';
 import PreviousDiseases from './pages/PreviousDiseases';
 
+import { API_BASE_URL } from './config';
+
 export default function MedcareApp() {
   const [currentView, setCurrentView] = useState('login');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -49,24 +51,43 @@ export default function MedcareApp() {
   // Avatar State scoped per user ID
   const [userAvatar, setUserAvatar] = useState(() => {
     const uid = getCurrentUserId();
-    return localStorage.getItem(`userAvatar_${uid}`) || localStorage.getItem('userAvatar') || null;
+    return localStorage.getItem(`userAvatar_${uid}`) || localStorage.getItem(`cached_userAvatar_${uid}`) || null;
   });
 
-  // Update user state whenever currentView changes (e.g., after logging in)
+  // Fetch avatar & profile from MongoDB and synchronize whenever user session changes
   useEffect(() => {
-    try {
-      const storedUser = JSON.parse(localStorage.getItem('user'));
-      if (storedUser) {
-        setUser(storedUser);
-        const uid = storedUser.uid || storedUser.email || 'guest_user';
-        const avatar = localStorage.getItem(`userAvatar_${uid}`) || localStorage.getItem('userAvatar');
-        if (avatar) setUserAvatar(avatar);
-      } else {
-        setUser(null);
+    const loadUserAndAvatar = async () => {
+      try {
+        const storedUser = JSON.parse(localStorage.getItem('user'));
+        if (storedUser) {
+          setUser(storedUser);
+          const uid = storedUser.uid || storedUser.email || 'guest_user';
+
+          // Try loading local cache first for instant load
+          const cachedAvatar = localStorage.getItem(`userAvatar_${uid}`) || localStorage.getItem(`cached_userAvatar_${uid}`);
+          if (cachedAvatar) setUserAvatar(cachedAvatar);
+
+          // Fetch fresh profile from MongoDB server
+          if (uid !== 'guest_user') {
+            const res = await fetch(`${API_BASE_URL}/api/profile/${uid}`);
+            if (res.ok) {
+              const profileData = await res.json();
+              if (profileData.avatar) {
+                setUserAvatar(profileData.avatar);
+                localStorage.setItem(`userAvatar_${uid}`, profileData.avatar);
+              }
+            }
+          }
+        } else {
+          setUser(null);
+          setUserAvatar(null);
+        }
+      } catch (e) {
+        console.error('Error loading user data or avatar:', e);
       }
-    } catch (e) {
-      console.error('Error reading user data from localStorage', e);
-    }
+    };
+
+    loadUserAndAvatar();
   }, [currentView]);
 
   // Notification States
@@ -112,18 +133,15 @@ export default function MedcareApp() {
     setShowNotifications(false);
   };
 
-  // Completely purge session and account cache on logout
+  // Safely purge session and active UI cache without destroying stored per-user avatars
   const handleLogout = () => {
     localStorage.removeItem('user');
+    
+    // Clean active session caches, while leaving userAvatar_[UID] safe
     Object.keys(localStorage).forEach(key => {
       if (
         key.startsWith('cached_') || 
-        key.startsWith('user_') || 
-        key.startsWith('userAvatar') || 
-        key.startsWith('userWeight') || 
-        key.startsWith('userHeight') || 
-        key.startsWith('patientName') || 
-        key.startsWith('patientId')
+        key.startsWith('user_profile_cache')
       ) {
         localStorage.removeItem(key);
       }
