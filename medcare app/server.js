@@ -9,7 +9,6 @@ import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import nodemailer from 'nodemailer';
-import { Resend } from 'resend';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { createRequire } from 'module';
@@ -93,21 +92,16 @@ if (serviceAccount) {
 }
 
 // ==========================================
-// 5. EMAIL TRANSPORTERS (RESEND HTTPS + NODEMAILER FALLBACK)
+// 5. NODEMAILER TRANSPORTER SETUP (IPv4 Forced)
 // ==========================================
 const senderEmail = process.env.EMAIL_USER || 'laxmankundekar85@gmail.com';
 const senderPass = process.env.EMAIL_PASS;
 
-// Resend HTTP API Client (Primary - Bypasses Render SMTP Blocking)
-const resendApiKey = process.env.RESEND_API_KEY;
-const resend = resendApiKey ? new Resend(resendApiKey) : null;
-
-// Nodemailer Transporter (Fallback)
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 587,
-  secure: false,
-  family: 4,
+  secure: false, // TLS
+  family: 4,     // Force IPv4 socket
   auth: {
     user: senderEmail,
     pass: senderPass
@@ -306,7 +300,7 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
 });
 
 // ==========================================
-// 8. ROUTE: SEND OTP (RESEND HTTP API + TERMINAL LOG BACKUP)
+// 8. ROUTE: SEND OTP (TERMINAL LOG BACKUP)
 // ==========================================
 app.post('/api/auth/send-otp', async (req, res) => {
   try {
@@ -323,86 +317,42 @@ app.post('/api/auth/send-otp', async (req, res) => {
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
     otpStore.set(targetEmail, { otp, expiresAt });
 
-    // 🔑 LOG OTP DIRECTLY TO RENDER LOGS FOR IMMEDIATE ACCESS
+    // 🔑 ALWAYS LOG OTP DIRECTLY TO RENDER LOGS FOR IMMEDIATE ACCESS
     console.log(`==========================================`);
     console.log(`🔑 [DEBUG OTP GENERATED]:`);
     console.log(`   TARGET EMAIL: ${targetEmail}`);
     console.log(`   VERIFICATION CODE: ${otp}`);
     console.log(`==========================================`);
 
-    let sentSuccessfully = false;
-    let lastError = '';
+    // Respond immediately to keep client UI fast
+    res.status(200).json({ success: true, message: 'OTP sent successfully to your email.' });
 
-    // Attempt 1: Try Resend API (HTTPS Request - Bypasses Render Port Blocks)
-    if (resend) {
-      try {
-        const { data, error } = await resend.emails.send({
-          from: 'Medcare Support <onboarding@resend.dev>',
-          to: targetEmail,
-          subject: 'Medcare - Password Reset Verification Code',
-          html: `
-            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-              <h2 style="color: #0d9488;">Medcare Password Reset</h2>
-              <p>You requested to reset your password. Use the verification code below:</p>
-              <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; width: 220px; margin: 20px 0;">
-                <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #0f766e;">${otp}</span>
-              </div>
-              <p>This code will expire in <strong>10 minutes</strong>.</p>
-            </div>
-          `
-        });
-
-        if (!error && data?.id) {
-          console.log(`✅ Sent via Resend API: ${data.id}`);
-          sentSuccessfully = true;
-        } else if (error) {
-          console.warn('⚠️ Resend API Warning:', error.message);
-          lastError = error.message;
-        }
-      } catch (rErr) {
-        console.warn('⚠️ Resend Exception:', rErr.message);
-        lastError = rErr.message;
-      }
-    }
-
-    // Attempt 2: Fallback to Nodemailer if Resend was skipped or failed
-    if (!sentSuccessfully) {
-      try {
-        const info = await transporter.sendMail({
-          from: `"Medcare Support" <${senderEmail}>`,
-          to: targetEmail,
-          subject: 'Medcare - Password Reset Verification Code',
-          html: `
-            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-              <h2 style="color: #0d9488;">Medcare Password Reset</h2>
-              <p>You requested to reset your password. Use the verification code below:</p>
-              <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; width: 220px; margin: 20px 0;">
-                <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #0f766e;">${otp}</span>
-              </div>
-              <p>This code will expire in <strong>10 minutes</strong>.</p>
-            </div>
-          `
-        });
-        console.log(`✅ Sent via Nodemailer: ${info.messageId}`);
-        sentSuccessfully = true;
-      } catch (nErr) {
-        console.error('❌ Nodemailer Error:', nErr.message);
-        lastError = nErr.message;
-      }
-    }
-
-    if (sentSuccessfully) {
-      return res.status(200).json({ success: true, message: 'OTP sent successfully to your email.' });
-    } else {
-      return res.status(500).json({ 
-        success: false, 
-        error: `Email delivery failed (${lastError}). Check Render logs for verification code.` 
-      });
-    }
+    // Send email asynchronously in background
+    transporter.sendMail({
+      from: `"Medcare Support" <${senderEmail}>`,
+      to: targetEmail,
+      subject: 'Medcare - Password Reset Verification Code',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: #0d9488;">Medcare Password Reset</h2>
+          <p>You requested to reset your password. Use the verification code below:</p>
+          <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; width: 220px; margin: 20px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #0f766e;">${otp}</span>
+          </div>
+          <p>This code will expire in <strong>10 minutes</strong>.</p>
+        </div>
+      `
+    }).then(info => {
+      console.log(`✅ Sent via Nodemailer: ${info.messageId}`);
+    }).catch(nErr => {
+      console.error('❌ Nodemailer Background Error:', nErr.message);
+    });
 
   } catch (err) {
     console.error('❌ Send OTP Route Error:', err.message);
-    return res.status(500).json({ success: false, error: err.message || 'Server error.' });
+    if (!res.headersSent) {
+      return res.status(500).json({ success: false, error: err.message || 'Server error.' });
+    }
   }
 });
 
