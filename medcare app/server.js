@@ -90,15 +90,15 @@ if (serviceAccount) {
 }
 
 // ==========================================
-// 5. NODEMAILER TRANSPORTER (Non-blocking)
+// 5. NODEMAILER TRANSPORTER (Port 465 Direct SSL)
 // ==========================================
 const senderEmail = process.env.EMAIL_USER || 'laxmankundekar85@gmail.com';
 const senderPass = process.env.EMAIL_PASS;
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // TLS on port 587
+  port: 465,
+  secure: true, // Direct SSL connection for high reliability on cloud hosts
   auth: {
     user: senderEmail,
     pass: senderPass
@@ -106,9 +106,9 @@ const transporter = nodemailer.createTransport({
   tls: {
     rejectUnauthorized: false
   },
-  connectionTimeout: 8000,
-  greetingTimeout: 8000,
-  socketTimeout: 10000
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 15000
 });
 
 // In-memory store for OTPs
