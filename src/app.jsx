@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Menu, Bell, X, Home, Calendar, BriefcaseMedical, FileText, 
   User, Settings as SettingsIcon, Pill, Syringe, 
-  Activity, FileClock, Bot
+  Activity, FileClock, Bot, QrCode
 } from 'lucide-react';
 
 // Import Layout Components
@@ -20,6 +20,7 @@ import Appointments from './pages/Appointments';
 import Alarms from './pages/Alarms';
 import PreviousDiseases from './pages/PreviousDiseases';
 import Chatbot from './pages/Chatbot';
+import MedicineScanner from './pages/MedicineScanner';
 
 import { API_BASE_URL } from './config';
 
@@ -251,6 +252,7 @@ export default function MedcareApp() {
             <nav className="flex-1 overflow-y-auto py-4 px-4 space-y-2">
               <SidebarItem icon={<Home size={20}/>} label="Dashboard" onClick={() => navigateTo('dashboard')} active={currentView === 'dashboard'} />
               <SidebarItem icon={<Bot size={20}/>} label="AI Assistant" onClick={() => navigateTo('chatbot')} active={currentView === 'chatbot'} />
+              <SidebarItem icon={<QrCode size={20}/>} label="Scan Medicine" onClick={() => navigateTo('scanner')} active={currentView === 'scanner'} />
               <SidebarItem icon={<Pill size={20}/>} label="Medications" onClick={() => navigateTo('medications')} active={currentView === 'medications'} />
               <SidebarItem icon={<Syringe size={20}/>} label="Injections" onClick={() => navigateTo('injections')} active={currentView === 'injections'} />
               <SidebarItem icon={<Activity size={20}/>} label="Previous Diseases" onClick={() => navigateTo('diseases')} active={currentView === 'diseases'} />
@@ -281,6 +283,7 @@ export default function MedcareApp() {
       <main className="p-4">
         {currentView === 'dashboard' && <Dashboard onNavigate={navigateTo} />}
         {currentView === 'chatbot' && <Chatbot />}
+        {currentView === 'scanner' && <MedicineScanner />}
         {currentView === 'appointments' && <Appointments />}
         {currentView === 'alarms' && <Alarms />}
         {currentView === 'medications' && <Medications />}

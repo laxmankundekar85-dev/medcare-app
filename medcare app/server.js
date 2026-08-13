@@ -321,6 +321,103 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
+// ==========================================
+// 7. ROUTE: MEDICINE SCANNER (VISION & QR ANALYSIS)
+// ==========================================
+app.post('/api/scan-medicine', async (req, res) => {
+  try {
+    const { scanType, imageBase64 } = req.body;
+
+    if (!imageBase64) {
+      return res.status(400).json({ success: false, error: 'Image data is required.' });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ success: false, error: 'GEMINI_API_KEY is missing in environment variables.' });
+    }
+
+    // Strip Base64 header prefix if included
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+
+    // Extract mime type if available
+    const mimeMatch = imageBase64.match(/^data:(image\/\w+);base64,/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+
+    const systemPrompt = scanType === 'qr'
+      ? `You are an expert pharmaceutical AI assistant. Analyze this image containing a medicine QR code, barcode, or package text.
+         Identify the medicine and provide clear information in this structured format:
+
+         💊 **Medicine Name:** [Name and Strength]
+         🏥 **Used For Diseases / Symptoms:** [Bullet list of conditions]
+         ⚖️ **Recommended Dosage:** [Standard dosage details]
+         ⚠️ **Key Precautions:** [Important warnings and contraindications]`
+      : `You are an expert pharmaceutical AI assistant. Visually identify this medicine from the uploaded photo (pill, capsule, bottle, strip, or package).
+         Provide details in this structured format:
+
+         💊 **Identified Medicine:** [Name and Strength if visible]
+         🏥 **Used For Diseases / Symptoms:** [Bullet list of conditions]
+         ⚖️ **Typical Dosage:** [Standard dosage guidance]
+         ⚠️ **Important Precautions:** [Safety guidelines and warnings]`;
+
+    const apiEndpoints = [
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+    ];
+
+    let analysisText = '';
+
+    for (const url of apiEndpoints) {
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: systemPrompt },
+                  {
+                    inline_data: {
+                      mime_type: mimeType,
+                      data: base64Data
+                    }
+                  }
+                ]
+              }
+            ]
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+          analysisText = data.candidates[0].content.parts[0].text;
+          break;
+        }
+      } catch (err) {
+        console.warn('Gemini Vision API Fetch Error:', err.message);
+      }
+    }
+
+    if (analysisText) {
+      return res.json({ success: true, analysis: analysisText });
+    } else {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Could not clearly identify the medicine image. Please take a clearer photo with good lighting.' 
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Medicine Scan API Error:', error.message);
+    res.status(500).json({ success: false, error: error.message || 'Server error while processing medicine scan.' });
+  }
+});
+
 // Fallback Route: Direct PATCH handler for medication status toggle
 app.patch('/api/medications/:id/toggle', async (req, res) => {
   try {
@@ -359,7 +456,7 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
 });
 
 // ==========================================
-// 7. ROUTE: SEND OTP (HTTPS REST API + TERMINAL LOG BACKUP)
+// 8. ROUTE: SEND OTP (HTTPS REST API + TERMINAL LOG BACKUP)
 // ==========================================
 app.post('/api/auth/send-otp', (req, res) => {
   try {
@@ -406,7 +503,7 @@ app.post('/api/auth/send-otp', (req, res) => {
 });
 
 // ==========================================
-// 8. ROUTE: VERIFY OTP & RESET PASSWORD
+// 9. ROUTE: VERIFY OTP & RESET PASSWORD
 // ==========================================
 app.post('/api/auth/verify-otp-reset', async (req, res) => {
   try {
@@ -452,7 +549,7 @@ app.post('/api/auth/verify-otp-reset', async (req, res) => {
 });
 
 // ==========================================
-// 9. START SERVER IMMEDIATELY
+// 10. START SERVER IMMEDIATELY
 // ==========================================
 const PORT = process.env.PORT || 5000;
 
