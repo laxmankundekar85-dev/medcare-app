@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   QrCode, Camera, ChevronRight, Info, 
   Sparkles, AlertCircle, CheckCircle2, RotateCcw, X 
@@ -14,7 +14,7 @@ export default function MedicineScanner() {
   const [scanResult, setScanResult] = useState(null);
   const [error, setError] = useState(null);
 
-  const photoInputRef = React.useRef(null);
+  const photoInputRef = useRef(null);
 
   // Streamlined Live QR Scanner using core Html5Qrcode
   useEffect(() => {
@@ -76,19 +76,27 @@ export default function MedicineScanner() {
     });
   };
 
-  // Analyze Decoded Text from QR Camera
+  // Analyze Decoded Text from QR Camera via AI Chat API
   const analyzeScannedText = async (textData) => {
     setLoading(true);
     setError(null);
     setScanResult(null);
 
     try {
+      const promptText = `I scanned a medicine QR code/barcode containing this raw text/code: "${textData}". 
+      
+Please identify the medicine from this code or text and explain:
+💊 **Medicine Name & Strength**
+🏥 **Diseases / Conditions Used For**
+⚖️ **Recommended Dosage Guidelines**
+⚠️ **Important Safety Precautions**`;
+
       const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: 'guest_user',
-          message: `Please identify and analyze this medicine details extracted from a scanned QR code: "${textData}". Provide medicine name, target diseases, recommended dosage, and key precautions.`
+          message: promptText
         })
       });
 
@@ -303,7 +311,7 @@ export default function MedicineScanner() {
       {loading && (
         <div className="bg-teal-50 border border-teal-200 text-teal-800 p-4 rounded-2xl text-center space-y-2">
           <div className="w-6 h-6 border-2 border-teal-800 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs font-bold">Medcare AI is analyzing your QR code details...</p>
+          <p className="text-xs font-bold">Medcare AI is analyzing your medicine details...</p>
         </div>
       )}
 
