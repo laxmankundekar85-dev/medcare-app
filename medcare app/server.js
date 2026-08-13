@@ -90,16 +90,16 @@ if (serviceAccount) {
 }
 
 // ==========================================
-// 5. NODEMAILER TRANSPORTER (Forced IPv4)
+// 5. NODEMAILER TRANSPORTER (Forced IPv4 on Port 587)
 // ==========================================
 const senderEmail = process.env.EMAIL_USER || 'laxmankundekar85@gmail.com';
 const senderPass = process.env.EMAIL_PASS;
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // Direct SSL
-  family: 4,    // FORCE IPv4 ONLY (Fixes ENETUNREACH IPv6 issue on Render)
+  port: 587,
+  secure: false, // TLS
+  family: 4,     // FORCE IPv4 (Fixes ENETUNREACH IPv6 issue on Render)
   auth: {
     user: senderEmail,
     pass: senderPass
