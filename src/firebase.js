@@ -5,7 +5,6 @@ import {
   signInWithPopup, 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
-  sendPasswordResetEmail, 
   signOut 
 } from "firebase/auth";
 
@@ -21,12 +20,7 @@ const firebaseConfig = {
 };
 
 // Guarantee default app initialization synchronously
-let app;
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp();
-}
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize Auth explicitly bound to 'app'
 export const auth = getAuth(app);
@@ -37,7 +31,6 @@ export {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   signInWithPopup, 
-  sendPasswordResetEmail, 
   signOut 
 };
 
