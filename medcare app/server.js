@@ -92,7 +92,7 @@ if (serviceAccount) {
 }
 
 // ==========================================
-// 5. NODEMAILER TRANSPORTER SETUP (IPv4 Forced)
+// 5. NODEMAILER TRANSPORTER SETUP (Strict IPv4 Lookup Override)
 // ==========================================
 const senderEmail = process.env.EMAIL_USER || 'laxmankundekar85@gmail.com';
 const senderPass = process.env.EMAIL_PASS;
@@ -101,10 +101,13 @@ const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 587,
   secure: false, // TLS
-  family: 4,     // Force IPv4 socket
   auth: {
     user: senderEmail,
     pass: senderPass
+  },
+  // Force DNS lookup to resolve strictly IPv4 to prevent Render ENETUNREACH socket errors
+  lookup: (hostname, options, callback) => {
+    dns.lookup(hostname, { family: 4 }, callback);
   },
   tls: {
     rejectUnauthorized: false
