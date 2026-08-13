@@ -29,7 +29,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
-// Safe preflight regex handler
+// Safe preflight regex handler for mobile web browsers
 app.options(/(.*)/, cors());
 
 // ==========================================
@@ -300,9 +300,9 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
 });
 
 // ==========================================
-// 8. ROUTE: SEND OTP (TERMINAL LOG BACKUP)
+// 8. ROUTE: SEND OTP (INSTANT MOBILE RESPONSE + LOG BACKUP)
 // ==========================================
-app.post('/api/auth/send-otp', async (req, res) => {
+app.post('/api/auth/send-otp', (req, res) => {
   try {
     const { email } = req.body;
 
@@ -317,17 +317,17 @@ app.post('/api/auth/send-otp', async (req, res) => {
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
     otpStore.set(targetEmail, { otp, expiresAt });
 
-    // 🔑 ALWAYS LOG OTP DIRECTLY TO RENDER LOGS FOR IMMEDIATE ACCESS
+    // 🔑 ALWAYS LOG OTP DIRECTLY TO RENDER TERMINAL LOGS FOR IMMEDIATE ACCESS
     console.log(`==========================================`);
     console.log(`🔑 [DEBUG OTP GENERATED]:`);
     console.log(`   TARGET EMAIL: ${targetEmail}`);
     console.log(`   VERIFICATION CODE: ${otp}`);
     console.log(`==========================================`);
 
-    // Respond immediately to keep client UI fast
+    // Respond IMMEDIATELY to release mobile browser lock & prevent preflight timeout
     res.status(200).json({ success: true, message: 'OTP sent successfully to your email.' });
 
-    // Send email asynchronously in background
+    // Dispatch Nodemailer asynchronously in background
     transporter.sendMail({
       from: `"Medcare Support" <${senderEmail}>`,
       to: targetEmail,
@@ -339,7 +339,7 @@ app.post('/api/auth/send-otp', async (req, res) => {
           <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; width: 220px; margin: 20px 0;">
             <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #0f766e;">${otp}</span>
           </div>
-          <p>This code will expire in <strong>10 minutes</strong>.</p>
+          <p>This code will expire in <strong>10 minutes</strong>. Do not share this code with anyone.</p>
         </div>
       `
     }).then(info => {
