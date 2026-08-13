@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   QrCode, Camera, ChevronRight, Info, 
   Sparkles, AlertCircle, CheckCircle2, RotateCcw, X 
 } from 'lucide-react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 import { API_BASE_URL } from '../config';
 
 export default function MedicineScanner() {
@@ -14,39 +14,44 @@ export default function MedicineScanner() {
   const [scanResult, setScanResult] = useState(null);
   const [error, setError] = useState(null);
 
-  const photoInputRef = useRef(null);
+  const photoInputRef = React.useRef(null);
 
-  // Initialize Real-Time Live QR Scanner Modal
+  // Streamlined Live QR Scanner using core Html5Qrcode
   useEffect(() => {
-    let scanner = null;
+    let html5Qrcode = null;
 
     if (isScanningQR) {
-      scanner = new Html5QrcodeScanner(
-        'qr-reader',
-        { 
-          fps: 10, 
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0 
-        },
-        /* verbose= */ false
-      );
+      html5Qrcode = new Html5Qrcode('qr-reader');
 
-      scanner.render(
-        async (decodedText) => {
-          // Successfully scanned a QR Code!
-          scanner.clear();
+      html5Qrcode
+        .start(
+          { facingMode: 'environment' }, // Default directly to back camera
+          {
+            fps: 10,
+            qrbox: { width: 220, height: 220 }
+          },
+          async (decodedText) => {
+            // QR Code Detected: Stop scanner automatically & process data
+            if (html5Qrcode.isScanning) {
+              await html5Qrcode.stop();
+            }
+            setIsScanningQR(false);
+            await analyzeScannedText(decodedText);
+          },
+          () => {
+            // Scanning frame active...
+          }
+        )
+        .catch((err) => {
+          console.error('Camera Access Error:', err);
+          setError('Unable to access rear camera. Please check camera permissions.');
           setIsScanningQR(false);
-          await analyzeScannedText(decodedText);
-        },
-        (errorMessage) => {
-          // QR Scanning in progress...
-        }
-      );
+        });
     }
 
     return () => {
-      if (scanner) {
-        scanner.clear().catch(() => {});
+      if (html5Qrcode && html5Qrcode.isScanning) {
+        html5Qrcode.stop().catch(() => {});
       }
     };
   }, [isScanningQR]);
@@ -65,14 +70,10 @@ export default function MedicineScanner() {
   const convertBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      fileReaderReadAsDataURL(reader, file, resolve, reject);
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (err) => reject(err);
     });
-  };
-
-  const fileReaderReadAsDataURL = (reader, file, resolve, reject) => {
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = (err) => reject(err);
   };
 
   // Analyze Decoded Text from QR Camera
@@ -186,7 +187,7 @@ export default function MedicineScanner() {
 
       {/* Option Cards */}
       <div className="space-y-3 pt-1">
-        {/* Option 1: Live QR Scanner Modal Trigger */}
+        {/* Option 1: Live QR Scanner */}
         <button
           type="button"
           onClick={() => {
@@ -235,26 +236,26 @@ export default function MedicineScanner() {
         </button>
       </div>
 
-      {/* Live QR Camera Scanner Overlay Container */}
+      {/* Clean Scanner Modal Window */}
       {isScanningQR && (
         <div className="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-3xl p-5 relative space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b pb-2">
-              <h3 className="font-bold text-slate-900 text-base">Align QR Code in Frame</h3>
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-bold text-slate-900 text-sm">Align QR Code in Frame</h3>
               <button
                 type="button"
                 onClick={() => setIsScanningQR(false)}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-700"
+                className="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            {/* Html5Qrcode Scanner Target Div */}
-            <div id="qr-reader" className="w-full overflow-hidden rounded-2xl"></div>
+            {/* Pure Camera Feed Target */}
+            <div id="qr-reader" className="w-full overflow-hidden rounded-2xl bg-black"></div>
 
             <p className="text-xs text-slate-500 text-center">
-              Hold camera steady over the medicine QR code
+              Scanning automatically...
             </p>
           </div>
         </div>
