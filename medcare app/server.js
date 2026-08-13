@@ -418,6 +418,77 @@ app.post('/api/scan-medicine', async (req, res) => {
   }
 });
 
+// ==========================================
+// 8. ROUTE: SCAN QR TEXT / URL ANALYSIS
+// ==========================================
+app.post('/api/scan-qr-text', async (req, res) => {
+  try {
+    const { textData } = req.body;
+
+    if (!textData) {
+      return res.status(400).json({ success: false, error: 'Scanned text/data is required.' });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ success: false, error: 'GEMINI_API_KEY is missing in environment variables.' });
+    }
+
+    const systemPrompt = `You are an expert pharmaceutical AI assistant. The user scanned a QR code or barcode on a medicine package, which decoded into the following string or URL: "${textData}".
+
+Please analyze this string (e.g., brand name, URL, batch information) and provide a structured clinical breakdown:
+
+💊 **Identified Medicine / Product:** [Name and brand based on the string or website domain]
+🏥 **Primary Usage & Conditions:** [Explain what this product/medicine is used for, e.g., Oral Rehydration Therapy / Dehydration for Electral]
+⚖️ **Typical Dosage & Administration:** [Standard dosage guidance or preparation instructions]
+⚠️ **Key Safety Precautions:** [Important warnings or contraindications]`;
+
+    const apiEndpoints = [
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+    ];
+
+    let replyText = '';
+
+    for (const url of apiEndpoints) {
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: systemPrompt }] }]
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+          replyText = data.candidates[0].content.parts[0].text;
+          break;
+        }
+      } catch (err) {
+        console.warn('Gemini API Error:', err.message);
+      }
+    }
+
+    if (replyText) {
+      return res.json({ success: true, analysis: replyText });
+    } else {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Unable to analyze QR code text with AI.' 
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ QR Text API Error:', error.message);
+    res.status(500).json({ success: false, error: error.message || 'Server error processing QR text.' });
+  }
+});
+
 // Fallback Route: Direct PATCH handler for medication status toggle
 app.patch('/api/medications/:id/toggle', async (req, res) => {
   try {
@@ -456,7 +527,7 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
 });
 
 // ==========================================
-// 8. ROUTE: SEND OTP (HTTPS REST API + TERMINAL LOG BACKUP)
+// 9. ROUTE: SEND OTP (HTTPS REST API + TERMINAL LOG BACKUP)
 // ==========================================
 app.post('/api/auth/send-otp', (req, res) => {
   try {
@@ -503,7 +574,7 @@ app.post('/api/auth/send-otp', (req, res) => {
 });
 
 // ==========================================
-// 9. ROUTE: VERIFY OTP & RESET PASSWORD
+// 10. ROUTE: VERIFY OTP & RESET PASSWORD
 // ==========================================
 app.post('/api/auth/verify-otp-reset', async (req, res) => {
   try {
@@ -549,7 +620,7 @@ app.post('/api/auth/verify-otp-reset', async (req, res) => {
 });
 
 // ==========================================
-// 10. START SERVER IMMEDIATELY
+// 11. START SERVER IMMEDIATELY
 // ==========================================
 const PORT = process.env.PORT || 5000;
 
