@@ -76,20 +76,22 @@ export default function MedicineScanner() {
     });
   };
 
-  // Analyze Decoded Text from QR Camera via AI Chat API
+  // Analyze Decoded Text from QR Camera
   const analyzeScannedText = async (textData) => {
     setLoading(true);
     setError(null);
     setScanResult(null);
 
     try {
-      const promptText = `I scanned a medicine QR code/barcode containing this raw text/code: "${textData}". 
-      
-Please identify the medicine from this code or text and explain:
-💊 **Medicine Name & Strength**
-🏥 **Diseases / Conditions Used For**
-⚖️ **Recommended Dosage Guidelines**
-⚠️ **Important Safety Precautions**`;
+      const promptText = `Analyze this scanned pharmaceutical QR string or drug details: "${textData}". 
+
+Please provide a structured clinical breakdown:
+💊 **Identified Medicine & Strength**
+🏥 **Primary Usage & Targeted Diseases/Symptoms**
+⚖️ **Typical Dosage Guidelines**
+⚠️ **Essential Precautions & Safety Warnings**
+
+Important Note: Do not summarize logged patient profile records. Focus strictly on explaining the drug from the scanned input string above.`;
 
       const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: 'POST',
@@ -101,13 +103,22 @@ Please identify the medicine from this code or text and explain:
       });
 
       const data = await response.json();
-      if (response.ok && data.reply) {
+      
+      // Filter out generic profile fallbacks if Gemini API fallback triggers
+      if (
+        response.ok && 
+        data.reply && 
+        !data.reply.includes('Your current active Medcare medications')
+      ) {
         setScanResult(data.reply);
       } else {
-        setError('Could not process the scanned QR code details.');
+        setScanResult(
+          `💊 **Scanned Code Data:**\n"${textData}"\n\n*(Note: Ensure your GEMINI_API_KEY is active in your backend environment variables for full AI analysis.)*`
+        );
       }
     } catch (err) {
-      setError('Network error while analyzing QR code.');
+      console.error('QR Processing Error:', err);
+      setError('Network error while analyzing QR code details.');
     } finally {
       setLoading(false);
     }
@@ -141,6 +152,7 @@ Please identify the medicine from this code or text and explain:
         setError(data.error || 'Failed to identify medication photo.');
       }
     } catch (err) {
+      console.error('Photo Analysis Error:', err);
       setError('Network error while analyzing photo.');
     } finally {
       setLoading(false);
