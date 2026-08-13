@@ -9,6 +9,9 @@ import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { createRequire } from 'module';
 
+// Enables JSON file imports in ES Module environment
+const require = createRequire(import.meta.url);
+
 // ==========================================
 // ROUTE IMPORTS
 // ==========================================
@@ -19,9 +22,6 @@ import injectionRoutes from './routes/injectionRoutes.js';
 import recordRoutes from './routes/recordRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
 import previousDiseaseRoutes from './routes/previousDiseaseRoutes.js';
-
-// Enables JSON file imports in ES Module environment
-const require = createRequire(import.meta.url);
 
 const app = express();
 
@@ -232,60 +232,35 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    // Comprehensive Local Health Engine (Expanded First Aid & Emergency Rules)
+    // Comprehensive Local Health Engine
     if (!replyText) {
       console.log('💡 Processing query via Local Health Assistant Engine...');
       const lowerMsg = message.toLowerCase();
 
-      // Emergency: Snake Bite
       if (lowerMsg.includes('snake') || lowerMsg.includes('bite') || lowerMsg.includes('venom') || lowerMsg.includes('serpent')) {
         replyText = `🚨 **EMERGENCY FIRST AID FOR SNAKE BITE** 🚨\n\nHello ${patientName}! Please stay calm and take these steps **IMMEDIATELY**:\n\n1. 🚑 **CALL EMERGENCY SERVICES (108 / 911) NOW** or get to the nearest emergency medical room immediately.\n2. **Keep Calm & Still:** Movement causes venom to spread faster through the bloodstream.\n3. **Immobilize the Area:** Keep the bitten limb at or slightly below heart level.\n4. **Remove Tight Items:** Take off rings, watches, or tight clothing near the bite in case of swelling.\n5. ❌ **DO NOT:** Cut the wound, suck out venom, apply ice, or tie a tight tourniquet.\n\n*Note: Anti-venom at a hospital is the only effective treatment for venomous snake bites. Get to an ER right away!*`;
-
-      // Emergency: Chest Pain / Heart
       } else if (lowerMsg.includes('chest pain') || lowerMsg.includes('heart attack') || lowerMsg.includes('shortness of breath')) {
         replyText = `🚨 **CRITICAL MEDICAL EMERGENCY** 🚨\n\nHello ${patientName}! Chest pain can be a sign of a cardiac event. Please seek emergency medical care immediately:\n\n1. 🚑 **Call 108 / emergency services right away.**\n2. Sit down and rest in a comfortable position.\n3. Do not attempt to drive yourself to the hospital.\n\n*Note: Seek urgent clinical care immediately.*`;
-
-      // Emergency: Burns / Cuts / Bleeding
       } else if (lowerMsg.includes('burn') || lowerMsg.includes('bleed') || lowerMsg.includes('cut') || lowerMsg.includes('wound')) {
         replyText = `Hello ${patientName}! For cuts or burns first-aid:\n\n1. **Bleeding:** Apply firm, continuous pressure with a clean cloth.\n2. **Burns:** Run cool (not ice-cold) tap water over the burn for 10-15 minutes.\n3. **Cleanliness:** Wash mild wounds gently with clean water.\n\n⚠️ Seek doctor evaluation for deep wounds, heavy bleeding, or severe burns.`;
-
-      // Headache / Head Pain
       } else if (lowerMsg.includes('head') || lowerMsg.includes('headache') || lowerMsg.includes('head pain')) {
         replyText = `Hello ${patientName}! I am sorry to hear that your head is paining. 🤕\n\n**Immediate Relief Steps:**\n1. Rest in a dark, quiet, well-ventilated room.\n2. Hydrate with water, as dehydration is a primary trigger.\n3. Apply a cold or warm compress across your forehead.\n\n💊 **Active Logged Meds:** ${activeMeds}\n\n*Note: Please consult a physician before taking any unprescribed pain relief.*`;
-
-      // Fever
       } else if (lowerMsg.includes('fever') || lowerMsg.includes('temperature') || lowerMsg.includes('chills')) {
         replyText = `Hello ${patientName}! For fever management:\n\n1. Rest comfortably and drink fluids (water, ORS).\n2. Apply a damp cloth to your forehead or neck.\n3. Monitor your temperature periodically.\n\n*Note: Consult a doctor if fever stays high.*`;
-
-      // Stomach / Nausea
       } else if (lowerMsg.includes('stomach') || lowerMsg.includes('nausea') || lowerMsg.includes('vomit') || lowerMsg.includes('cramp')) {
         replyText = `Hello ${patientName}! For stomach discomfort:\n\n1. Sip small amounts of clear fluids or ginger tea.\n2. Avoid spicy or greasy foods.\n3. Rest in an upright position.\n\n*Note: Consult a doctor if severe pain persists.*`;
-
-      // General Unwell
       } else if (lowerMsg.includes('not feeling well') || lowerMsg.includes('sick') || lowerMsg.includes('unwell') || lowerMsg.includes('pain') || lowerMsg.includes('dizzy')) {
         replyText = `Hello ${patientName}! I am sorry to hear that you are not feeling well. 💙\n\nNext steps:\n1. Rest and sip water regularly.\n2. Verify your active medications: **${activeMeds}**.\n3. Track any new symptoms.\n\n*Note: Consult a doctor for clinical diagnosis.*`;
-
-      // Medications
       } else if (lowerMsg.includes('medication') || lowerMsg.includes('medicine') || lowerMsg.includes('taking') || lowerMsg.includes('dose') || lowerMsg.includes('pill')) {
         replyText = `Hello ${patientName}! 👋\n\nYour active Medcare medications:\n💊 **${activeMeds}**\n\nPlease follow your doctor's dosage schedule!`;
-
-      // Blood Pressure
       } else if (lowerMsg.includes('blood pressure') || lowerMsg.includes('bp') || lowerMsg.includes('hypertension')) {
         replyText = `Hello ${patientName}! Core tips for healthy blood pressure:\n1. Reduce sodium intake.\n2. Engage in 30 mins of daily moderate exercise.\n3. Manage stress and stay hydrated.`;
-
-      // Doctor Visit
       } else if (lowerMsg.includes('doctor') || lowerMsg.includes('visit') || lowerMsg.includes('prepare') || lowerMsg.includes('appointment')) {
         replyText = `Hello ${patientName}! To prepare for your visit:\n1. Note down symptoms and questions.\n2. Share your medication list (${activeMeds}).\n3. Bring previous lab reports.`;
-
-      // Hydration
       } else if (lowerMsg.includes('hydration') || lowerMsg.includes('water') || lowerMsg.includes('fluid') || lowerMsg.includes('drink')) {
         replyText = `Hello ${patientName}! Aim for 2.5 to 3 Liters of water daily for optimal health. 💧`;
-
-      // Greetings
       } else if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('hey')) {
         replyText = `Hello ${patientName}! 👋 Welcome to Medcare Assistant. How can I assist you with your health today?`;
-
-      // Fallback
       } else {
         replyText = `Hello ${patientName}! I am your Medcare AI Assistant.\n\nI can help you with:\n- First-aid guidance for symptoms & injuries\n- Information on your active medications (${activeMeds})\n- Preparing for doctor visits\n\nHow can I help you regarding your health right now?`;
       }
@@ -338,37 +313,44 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
 });
 
 // ==========================================
-// 8. ROUTE: SEND OTP (CRASH-PROOF & INDEPENDENT)
+// 8. ROUTE: SEND OTP (WITH DETAILED LOGGING)
 // ==========================================
 app.post('/api/auth/send-otp', async (req, res) => {
+  console.log('📌 POST /api/auth/send-otp endpoint hit');
   try {
     const { email } = req.body;
 
     if (!email) {
+      console.warn('⚠️ OTP Request missing email');
       return res.status(400).json({ success: false, error: 'Email address is required.' });
     }
 
     const targetEmail = email.toLowerCase().trim();
+    console.log(`📩 Processing OTP request for: "${targetEmail}"`);
 
     // Safely check Firebase Admin if initialized
     if (getApps().length > 0) {
       try {
         await getAuth().getUserByEmail(targetEmail);
+        console.log(`👤 Firebase user verified for ${targetEmail}`);
       } catch (firebaseErr) {
         if (firebaseErr.code === 'auth/user-not-found') {
+          console.warn(`❌ No user found in Firebase for: ${targetEmail}`);
           return res.status(404).json({ success: false, error: 'No account registered with this email address.' });
         }
-        console.warn('⚠️ Firebase Admin lookup error on server:', firebaseErr.message);
+        console.warn('⚠️ Firebase Admin lookup warning:', firebaseErr.message);
       }
     }
 
-    // Generate OTP
+    // Generate 6-Digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes expiration
     otpStore.set(targetEmail, { otp, expiresAt });
 
+    console.log(`⚙️ Generated OTP (${otp}). Sending email via Nodemailer...`);
+
     // Send Email via Nodemailer
-    await transporter.sendMail({
+    const mailInfo = await transporter.sendMail({
       from: `"Medcare Support" <${process.env.EMAIL_USER || 'laxmankundekar85@gmail.com'}>`,
       to: targetEmail,
       subject: 'Medcare - Password Reset Verification Code',
@@ -384,11 +366,11 @@ app.post('/api/auth/send-otp', async (req, res) => {
       `
     });
 
-    console.log(`✅ OTP (${otp}) successfully sent to ${targetEmail}`);
+    console.log(`✅ OTP (${otp}) successfully dispatched to ${targetEmail}. MessageID: ${mailInfo.messageId}`);
     return res.json({ success: true, message: 'OTP sent successfully to your email.' });
 
   } catch (err) {
-    console.error('❌ Send OTP Route Error:', err);
+    console.error('❌ Send OTP Route Execution Error:', err);
     return res.status(500).json({ success: false, error: err.message || 'Email delivery failed.' });
   }
 });
@@ -397,6 +379,7 @@ app.post('/api/auth/send-otp', async (req, res) => {
 // 9. ROUTE: VERIFY OTP & RESET PASSWORD
 // ==========================================
 app.post('/api/auth/verify-otp-reset', async (req, res) => {
+  console.log('📌 POST /api/auth/verify-otp-reset endpoint hit');
   try {
     const { email, otp, newPassword } = req.body;
 
@@ -424,6 +407,7 @@ app.post('/api/auth/verify-otp-reset', async (req, res) => {
       try {
         const user = await getAuth().getUserByEmail(targetEmail);
         await getAuth().updateUser(user.uid, { password: newPassword });
+        console.log(`🔒 Password updated in Firebase for ${targetEmail}`);
       } catch (fbErr) {
         console.warn('⚠️ Firebase password update skipped:', fbErr.message);
       }
@@ -431,7 +415,7 @@ app.post('/api/auth/verify-otp-reset', async (req, res) => {
 
     otpStore.delete(targetEmail);
 
-    console.log(`🔒 Password updated successfully for ${targetEmail}`);
+    console.log(`✅ Password reset successfully completed for ${targetEmail}`);
     return res.json({ success: true, message: 'Password updated successfully! You can now log in.' });
 
   } catch (err) {
