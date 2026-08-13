@@ -72,7 +72,7 @@ if (process.env.FIREBASE_PRIVATE_KEY) {
   try {
     serviceAccount = require('./serviceAccountKey.json');
   } catch (err) {
-    // Expected on Render production deployments where key is supplied via ENV vars
+    // Expected on Render production deployments
   }
 }
 
@@ -90,7 +90,7 @@ if (serviceAccount) {
 // In-memory store for OTPs
 const otpStore = new Map();
 
-// Helper function: Send email via Brevo REST API (Over HTTPS Port 443 - Never Blocked by Render)
+// Helper function: Send email via Brevo REST API (Over HTTPS Port 443)
 const sendEmailViaHTTPS = (toEmail, otpCode) => {
   return new Promise((resolve, reject) => {
     const apiKey = process.env.BREVO_API_KEY;
@@ -242,8 +242,9 @@ app.post('/api/chat', async (req, res) => {
       INSTRUCTIONS:
       1. Address the patient warmly by name (${patientName}).
       2. Respond directly, specifically, and intelligently to any health condition, medical query, emergency situation, or symptom requested.
-      3. Format your response cleanly using bullet points or bold text.
-      4. Always include a brief disclaimer: "Note: I am an AI assistant. Please consult a qualified doctor for clinical diagnoses."
+      3. For critical emergencies (like snake bite, chest pain, heavy bleeding), urge immediate emergency hospitalization and provide crucial immediate first-aid steps.
+      4. Format your response cleanly using bullet points or bold text.
+      5. Always include a brief disclaimer: "Note: I am an AI assistant. Please consult a qualified doctor for clinical diagnoses."
     `;
 
     const fullPrompt = `${systemPrompt}\n\nPatient Query: ${message}`;
@@ -276,13 +277,40 @@ app.post('/api/chat', async (req, res) => {
             break;
           }
         } catch (err) {
-          console.warn(`Fetch error:`, err.message);
+          console.warn(`Gemini Fetch Error:`, err.message);
         }
       }
     }
 
+    // =========================================================
+    // INTELLIGENT RULE ENGINE FALLBACK (WHEN GEMINI API UNREACHABLE)
+    // =========================================================
     if (!replyText) {
-      replyText = `Hello ${patientName}! I am your Medcare AI Assistant. How can I assist you with your health today?\n\n*Note: I am an AI assistant. Please consult a qualified doctor for clinical diagnoses.*`;
+      const lowerMsg = message.toLowerCase();
+
+      if (lowerMsg.includes('fever') || lowerMsg.includes('temperature') || lowerMsg.includes('chills') || lowerMsg.includes('hot body')) {
+        replyText = `Hello ${patientName}! 🤒 For fever management:\n\n1. **Rest & Hydration:** Rest in a cool room and sip water or ORS regularly to stay hydrated.\n2. **Cool Sponge:** Apply a clean, damp cloth to your forehead, neck, and wrists.\n3. **Monitor:** Keep track of your body temperature periodically.\n\n💊 **Active Logged Meds:** ${activeMeds}\n\n*Note: If your fever exceeds 102°F (38.8°C) or lasts more than 3 days, please consult a doctor immediately.*`;
+      } else if (lowerMsg.includes('snake') || lowerMsg.includes('bite') || lowerMsg.includes('venom') || lowerMsg.includes('serpent')) {
+        replyText = `🚨 **EMERGENCY FIRST AID FOR SNAKE BITE** 🚨\n\nHello ${patientName}! Please stay calm and take these steps **IMMEDIATELY**:\n\n1. 🚑 **CALL EMERGENCY SERVICES (108 / 911) NOW** or get to the nearest ER room.\n2. **Keep Calm & Still:** Movement causes venom to spread faster.\n3. **Immobilize the Area:** Keep the bitten limb slightly below heart level.\n4. **Remove Tight Items:** Take off rings, watches, or tight clothing near the bite.\n5. ❌ **DO NOT:** Cut the wound, suck out venom, or apply ice/tourniquets.\n\n*Note: Anti-venom at a hospital is the only effective treatment. Seek emergency care right away!*`;
+      } else if (lowerMsg.includes('chest pain') || lowerMsg.includes('heart attack') || lowerMsg.includes('shortness of breath')) {
+        replyText = `🚨 **CRITICAL MEDICAL EMERGENCY** 🚨\n\nHello ${patientName}! Chest pain can be a sign of a cardiac event. Please seek emergency medical care immediately:\n\n1. 🚑 **Call 108 / emergency services right away.**\n2. Sit down and rest in a comfortable, relaxed position.\n3. Do not attempt to drive yourself to the hospital.\n\n*Note: Seek urgent clinical care immediately.*`;
+      } else if (lowerMsg.includes('burn') || lowerMsg.includes('bleed') || lowerMsg.includes('cut') || lowerMsg.includes('wound')) {
+        replyText = `Hello ${patientName}! For cuts or burns first-aid:\n\n1. **Bleeding:** Apply firm, continuous pressure with a clean cloth.\n2. **Burns:** Run cool (not ice-cold) tap water over the burn for 10-15 minutes.\n3. **Cleanliness:** Wash mild wounds gently with clean water.\n\n⚠️ Seek doctor evaluation for deep wounds or severe burns.`;
+      } else if (lowerMsg.includes('head') || lowerMsg.includes('headache') || lowerMsg.includes('head pain')) {
+        replyText = `Hello ${patientName}! I am sorry to hear that your head is paining. 🤕\n\n**Immediate Relief Steps:**\n1. Rest in a dark, quiet, well-ventilated room.\n2. Hydrate with water, as dehydration is a primary headache trigger.\n3. Apply a cool compress across your forehead.\n\n💊 **Active Logged Meds:** ${activeMeds}\n\n*Note: Please consult a physician before taking any unprescribed pain relief.*`;
+      } else if (lowerMsg.includes('stomach') || lowerMsg.includes('nausea') || lowerMsg.includes('vomit') || lowerMsg.includes('cramp') || lowerMsg.includes('diarrhea')) {
+        replyText = `Hello ${patientName}! For stomach discomfort:\n\n1. Sip small amounts of clear fluids, ORS, or ginger tea.\n2. Avoid spicy, greasy, or heavy dairy foods.\n3. Rest in an upright position.\n\n*Note: Consult a doctor if severe pain persists.*`;
+      } else if (lowerMsg.includes('medication') || lowerMsg.includes('medicine') || lowerMsg.includes('taking') || lowerMsg.includes('dose') || lowerMsg.includes('pill')) {
+        replyText = `Hello ${patientName}! 👋\n\nYour current active Medcare medications:\n💊 **${activeMeds}**\n\nPlease follow your prescribed dosage schedule!`;
+      } else if (lowerMsg.includes('blood pressure') || lowerMsg.includes('bp') || lowerMsg.includes('hypertension')) {
+        replyText = `Hello ${patientName}! Core tips for healthy blood pressure:\n1. Reduce daily sodium (salt) intake.\n2. Engage in 30 mins of daily light-to-moderate exercise.\n3. Manage stress levels and stay hydrated.`;
+      } else if (lowerMsg.includes('hydration') || lowerMsg.includes('water') || lowerMsg.includes('drink')) {
+        replyText = `Hello ${patientName}! Aim for 2.5 to 3 Liters of water daily for optimal organ health. 💧`;
+      } else if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('hey')) {
+        replyText = `Hello ${patientName}! 👋 Welcome to Medcare Assistant. How can I assist you with your health today?`;
+      } else {
+        replyText = `Hello ${patientName}! I am your Medcare AI Assistant.\n\nI can assist you with:\n- First-aid guidance for symptoms (fever, headache, burns, injuries)\n- Checking active medications (**${activeMeds}**)\n- Health & wellness advice\n\nHow can I help you regarding your health right now?\n\n*Note: I am an AI assistant. Please consult a qualified doctor for clinical diagnoses.*`;
+      }
     }
 
     res.json({ success: true, reply: replyText });
@@ -355,7 +383,7 @@ app.post('/api/auth/send-otp', (req, res) => {
     console.log(`   VERIFICATION CODE: ${otp}`);
     console.log(`==========================================`);
 
-    // Respond IMMEDIATELY to client UI to prevent mobile preflight timeouts
+    // Respond IMMEDIATELY to client UI
     res.status(200).json({ success: true, message: 'OTP sent successfully to your email.' });
 
     // Dispatch email over HTTPS REST API in background
