@@ -291,15 +291,15 @@ export default function MedcareApp() {
         {currentView === 'settings' && <Settings onLogout={handleLogout} />}
       </main>
 
-      {/* Floating AI Assistant Action Button (Placed on Left to prevent overlapping '+' buttons on the right) */}
+      {/* Floating AI Assistant Action Button (Placed at bottom-36 right-5 directly ABOVE the + button) */}
       {currentView !== 'chatbot' && (
         <button
           type="button"
           onClick={() => navigateTo('chatbot')}
-          className="fixed bottom-20 left-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-teal-800 text-white shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer border-2 border-slate-50"
+          className="fixed bottom-36 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-teal-800 text-white shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer border-2 border-slate-50"
           aria-label="Open AI Assistant"
         >
-          <Bot size={28} />
+          <Bot size={24} />
         </button>
       )}
 
