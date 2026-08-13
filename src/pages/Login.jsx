@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BriefcaseMedical, Mail, Lock, Eye, EyeOff, LogOut, ArrowLeft, KeyRound } from 'lucide-react';
 import { 
   auth, 
@@ -24,6 +24,15 @@ export default function Login({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Automatically ping the backend when the Forgot Password view is toggled to wake up Render
+  useEffect(() => {
+    if (isForgotPassword) {
+      fetch(`${API_BASE_URL}/api/ping`, { method: 'GET' }).catch(() => {
+        // Silent catch for pre-flight keep-alive ping
+      });
+    }
+  }, [isForgotPassword]);
 
   const clearFormState = () => {
     setEmail('');
@@ -118,9 +127,9 @@ export default function Login({ onLogin }) {
 
     setLoading(true);
 
-    // 10-second timeout controller to ensure mobile browsers never hang infinitely
+    // Extended 25-second timeout window to accommodate Render free tier cold starts
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
@@ -155,7 +164,7 @@ export default function Login({ onLogin }) {
     } catch (err) {
       console.error("Backend connection error:", err);
       if (err.name === 'AbortError') {
-        setError('Server response timed out. Please check your network or tap "Send Verification OTP" again.');
+        setError('Server cold start took too long. Please tap "Send Verification OTP" again.');
       } else {
         setError(`Unable to connect to backend server at ${API_BASE_URL}. Ensure the backend is running.`);
       }
@@ -183,7 +192,7 @@ export default function Login({ onLogin }) {
     setLoading(true);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/verify-otp-reset`, {
