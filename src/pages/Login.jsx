@@ -100,6 +100,7 @@ export default function Login({ onLogin }) {
     }
   };
 
+  // STRICT BACKEND OTP DISPATCH (NO FIREBASE LINK FALLBACK)
   const handleSendOTP = async (e) => {
     e.preventDefault();
     setError('');
@@ -119,7 +120,6 @@ export default function Login({ onLogin }) {
     setLoading(true);
 
     try {
-      // Direct call to custom backend OTP API
       const response = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,8 +135,8 @@ export default function Login({ onLogin }) {
         setError(data.error || 'Failed to send OTP code.');
       }
     } catch (err) {
-      console.error("Backend OTP error:", err);
-      setError(`Server error. Unable to connect to backend at ${API_BASE_URL}`);
+      console.error("Backend connection error:", err);
+      setError(`Unable to connect to backend service. Please try again in a few seconds.`);
     } finally {
       setLoading(false);
     }
