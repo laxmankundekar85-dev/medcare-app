@@ -1,3 +1,7 @@
+import dns from 'dns';
+// FORCE Node.js to resolve IPv4 addresses first (Fixes Render ENETUNREACH IPv6 bug)
+dns.setDefaultResultOrder('ipv4first');
+
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -25,11 +29,11 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
-// Use regex match to prevent path-to-regexp parsing errors on route OPTIONS preflight
+// Safe preflight regex handler
 app.options(/(.*)/, cors());
 
 // ==========================================
-// 2. HEALTH & WAKEUP ROUTES (DEFINED FIRST)
+// 2. HEALTH & WAKEUP ROUTES
 // ==========================================
 app.get('/', (req, res) => {
   res.status(200).send('Medcare Backend API is running...');
@@ -79,9 +83,7 @@ if (process.env.FIREBASE_PRIVATE_KEY) {
 if (serviceAccount) {
   try {
     if (getApps().length === 0) {
-      initializeApp({
-        credential: cert(serviceAccount)
-      });
+      initializeApp({ credential: cert(serviceAccount) });
       console.log('🔥 Firebase Admin SDK initialized');
     }
   } catch (err) {
@@ -90,7 +92,7 @@ if (serviceAccount) {
 }
 
 // ==========================================
-// 5. NODEMAILER TRANSPORTER (Forced IPv4 on Port 587)
+// 5. NODEMAILER TRANSPORTER (Forced IPv4)
 // ==========================================
 const senderEmail = process.env.EMAIL_USER || 'laxmankundekar85@gmail.com';
 const senderPass = process.env.EMAIL_PASS;
@@ -99,7 +101,7 @@ const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 587,
   secure: false, // TLS
-  family: 4,     // FORCE IPv4 (Fixes ENETUNREACH IPv6 issue on Render)
+  family: 4,     // Force IPv4 socket
   auth: {
     user: senderEmail,
     pass: senderPass
@@ -327,7 +329,7 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
 });
 
 // ==========================================
-// 8. ROUTE: SEND OTP (AWAITED DELIVERED RESPONSE)
+// 8. ROUTE: SEND OTP
 // ==========================================
 app.post('/api/auth/send-otp', async (req, res) => {
   try {
@@ -346,7 +348,6 @@ app.post('/api/auth/send-otp', async (req, res) => {
 
     console.log(`📩 Dispatching OTP (${otp}) to "${targetEmail}" via ${senderEmail}...`);
 
-    // Await email delivery so Render process completes sending cleanly
     const info = await transporter.sendMail({
       from: `"Medcare Support" <${senderEmail}>`,
       to: targetEmail,
