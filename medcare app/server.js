@@ -8,6 +8,7 @@ import https from 'https';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { createRequire } from 'module';
+import { GoogleGenAI } from '@google/genai';
 
 const require = createRequire(import.meta.url);
 
@@ -251,36 +252,46 @@ app.post('/api/chat', async (req, res) => {
     let replyText = '';
 
     if (apiKey) {
-      const apiEndpoints = [
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`,
-        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent`
-      ];
+      try {
+        const ai = new GoogleGenAI({ apiKey });
+        const aiResponse = await ai.models.generateContent({
+          model: 'gemini-2.0-flash',
+          contents: fullPrompt,
+        });
 
-      for (const baseUrl of apiEndpoints) {
-        try {
-          const response = await fetch(`${baseUrl}?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'x-goog-api-key': apiKey,
-              'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: fullPrompt }] }]
-            })
-          });
+        if (aiResponse && aiResponse.text) {
+          replyText = aiResponse.text;
+        }
+      } catch (sdkErr) {
+        console.warn('SDK Chat Call failed, trying HTTP fallback:', sdkErr.message);
+        const apiEndpoints = [
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`
+        ];
 
-          const data = await response.json();
+        for (const baseUrl of apiEndpoints) {
+          try {
+            const response = await fetch(`${baseUrl}?key=${apiKey}`, {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey,
+                'Authorization': `Bearer ${apiKey}`
+              },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: fullPrompt }] }]
+              })
+            });
 
-          if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-            replyText = data.candidates[0].content.parts[0].text;
-            break;
-          } else if (data?.error) {
-            console.warn(`Gemini Chat API Error (${baseUrl}):`, data.error.message);
+            const data = await response.json();
+
+            if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+              replyText = data.candidates[0].content.parts[0].text;
+              break;
+            }
+          } catch (err) {
+            console.warn(`Gemini Fetch Error:`, err.message);
           }
-        } catch (err) {
-          console.warn(`Gemini Fetch Error:`, err.message);
         }
       }
     }
@@ -363,49 +374,69 @@ app.post('/api/scan-medicine', async (req, res) => {
          ⚖️ **Typical Dosage:** [Standard dosage guidance]
          ⚠️ **Important Precautions:** [Safety guidelines and warnings]`;
 
-    const apiEndpoints = [
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`
-    ];
-
     let analysisText = '';
 
-    for (const baseUrl of apiEndpoints) {
-      try {
-        const response = await fetch(`${baseUrl}?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey,
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { text: systemPrompt },
-                  {
-                    inline_data: {
-                      mime_type: mimeType,
-                      data: base64Data
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const aiResponse = await ai.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: [
+          { text: systemPrompt },
+          {
+            inlineData: {
+              mimeType: mimeType,
+              data: base64Data
+            }
+          }
+        ]
+      });
+
+      if (aiResponse && aiResponse.text) {
+        analysisText = aiResponse.text;
+      }
+    } catch (sdkErr) {
+      console.warn('SDK Vision Call failed, trying HTTP fallback:', sdkErr.message);
+
+      const apiEndpoints = [
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`
+      ];
+
+      for (const baseUrl of apiEndpoints) {
+        try {
+          const response = await fetch(`${baseUrl}?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey,
+              'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    { text: systemPrompt },
+                    {
+                      inline_data: {
+                        mime_type: mimeType,
+                        data: base64Data
+                      }
                     }
-                  }
-                ]
-              }
-            ]
-          })
-        });
+                  ]
+                }
+              ]
+            })
+          });
 
-        const data = await response.json();
+          const data = await response.json();
 
-        if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-          analysisText = data.candidates[0].content.parts[0].text;
-          break;
-        } else if (data?.error) {
-          console.warn(`Gemini Vision API Error (${baseUrl}):`, data.error.message);
+          if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            analysisText = data.candidates[0].content.parts[0].text;
+            break;
+          }
+        } catch (err) {
+          console.warn('Gemini Vision API Fetch Error:', err.message);
         }
-      } catch (err) {
-        console.warn('Gemini Vision API Fetch Error:', err.message);
       }
     }
 
@@ -449,37 +480,52 @@ Please analyze this string (e.g., brand name, URL, batch information) and provid
 ⚖️ **Typical Dosage & Administration:** [Standard dosage guidance or preparation instructions]
 ⚠️ **Key Safety Precautions:** [Important warnings or contraindications]`;
 
-    const apiEndpoints = [
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`
-    ];
-
     let replyText = '';
 
-    for (const baseUrl of apiEndpoints) {
-      try {
-        const response = await fetch(`${baseUrl}?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey,
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: systemPrompt }] }]
-          })
-        });
+    // Primary Execution via Official SDK
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const aiResponse = await ai.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: systemPrompt,
+      });
 
-        const data = await response.json();
+      if (aiResponse && aiResponse.text) {
+        replyText = aiResponse.text;
+      }
+    } catch (sdkErr) {
+      console.warn('SDK Execution failed, attempting HTTPS fallback:', sdkErr.message);
 
-        if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-          replyText = data.candidates[0].content.parts[0].text;
-          break;
-        } else if (data?.error) {
-          console.warn(`Gemini QR Text API Error (${baseUrl}):`, data.error.message);
+      const apiEndpoints = [
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`
+      ];
+
+      for (const baseUrl of apiEndpoints) {
+        try {
+          const response = await fetch(`${baseUrl}?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey,
+              'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: systemPrompt }] }]
+            })
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            replyText = data.candidates[0].content.parts[0].text;
+            break;
+          } else if (data?.error) {
+            console.warn(`Gemini QR Text API Error (${baseUrl}):`, data.error.message);
+          }
+        } catch (err) {
+          console.warn('Gemini API Fetch Error:', err.message);
         }
-      } catch (err) {
-        console.warn('Gemini API Fetch Error:', err.message);
       }
     }
 
