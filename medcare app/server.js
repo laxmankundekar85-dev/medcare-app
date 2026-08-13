@@ -11,17 +11,6 @@ import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
 
-// ==========================================
-// ROUTE IMPORTS
-// ==========================================
-import medicationRoutes from './routes/medicationRoutes.js';
-import appointmentRoutes from './routes/appointmentRoutes.js';
-import alarmRoutes from './routes/alarmRoutes.js';
-import injectionRoutes from './routes/injectionRoutes.js';
-import recordRoutes from './routes/recordRoutes.js';
-import profileRoutes from './routes/profileRoutes.js';
-import previousDiseaseRoutes from './routes/previousDiseaseRoutes.js';
-
 const app = express();
 
 // ==========================================
@@ -39,7 +28,25 @@ app.use(cors({
 app.options('*', cors());
 
 // ==========================================
-// 2. MONGODB CONNECTION
+// 2. HEALTH & WAKEUP ROUTES (DEFINED FIRST)
+// ==========================================
+app.get('/', (req, res) => {
+  res.status(200).send('Medcare Backend API is running...');
+});
+
+app.get('/api/ping', (req, res) => {
+  res.status(200).json({ status: 'awake', timestamp: Date.now() });
+});
+
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'Active', 
+    mongodb: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected' 
+  });
+});
+
+// ==========================================
+// 3. MONGODB CONNECTION
 // ==========================================
 if (process.env.MONGO_URI) {
   mongoose.connect(process.env.MONGO_URI)
@@ -50,9 +57,9 @@ if (process.env.MONGO_URI) {
 }
 
 // ==========================================
-// 3. FIREBASE ADMIN SDK SETUP
+// 4. FIREBASE ADMIN SDK SETUP
 // ==========================================
-let serviceAccount;
+let serviceAccount = null;
 
 if (process.env.FIREBASE_PRIVATE_KEY) {
   serviceAccount = {
@@ -82,7 +89,7 @@ if (serviceAccount) {
 }
 
 // ==========================================
-// 4. NODEMAILER TRANSPORTER (Non-blocking)
+// 5. NODEMAILER TRANSPORTER (Non-blocking)
 // ==========================================
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
@@ -104,33 +111,46 @@ const transporter = nodemailer.createTransport({
 const otpStore = new Map();
 
 // ==========================================
-// 5. HEALTH CHECK & WAKEUP ROUTES
+// 6. SAFE DYNAMIC ROUTE IMPORTS
 // ==========================================
-app.get('/', (req, res) => {
-  res.send('Medcare Backend API is running...');
-});
+const loadRoutes = async () => {
+  try {
+    const medicationRoutes = await import('./routes/medicationRoutes.js').then(m => m.default || m);
+    app.use('/api/medications', medicationRoutes);
+  } catch (e) { console.warn('Skipping medicationRoutes load:', e.message); }
 
-app.get('/api/ping', (req, res) => {
-  res.status(200).json({ status: 'awake', timestamp: Date.now() });
-});
+  try {
+    const appointmentRoutes = await import('./routes/appointmentRoutes.js').then(m => m.default || m);
+    app.use('/api/appointments', appointmentRoutes);
+  } catch (e) { console.warn('Skipping appointmentRoutes load:', e.message); }
 
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'Active', 
-    mongodb: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected' 
-  });
-});
+  try {
+    const alarmRoutes = await import('./routes/alarmRoutes.js').then(m => m.default || m);
+    app.use('/api/alarms', alarmRoutes);
+  } catch (e) { console.warn('Skipping alarmRoutes load:', e.message); }
 
-// ==========================================
-// 6. API FEATURE ROUTES
-// ==========================================
-app.use('/api/medications', medicationRoutes);
-app.use('/api/appointments', appointmentRoutes);
-app.use('/api/alarms', alarmRoutes);
-app.use('/api/injections', injectionRoutes);
-app.use('/api/records', recordRoutes);
-app.use('/api/profile', profileRoutes);
-app.use('/api/previous-diseases', previousDiseaseRoutes);
+  try {
+    const injectionRoutes = await import('./routes/injectionRoutes.js').then(m => m.default || m);
+    app.use('/api/injections', injectionRoutes);
+  } catch (e) { console.warn('Skipping injectionRoutes load:', e.message); }
+
+  try {
+    const recordRoutes = await import('./routes/recordRoutes.js').then(m => m.default || m);
+    app.use('/api/records', recordRoutes);
+  } catch (e) { console.warn('Skipping recordRoutes load:', e.message); }
+
+  try {
+    const profileRoutes = await import('./routes/profileRoutes.js').then(m => m.default || m);
+    app.use('/api/profile', profileRoutes);
+  } catch (e) { console.warn('Skipping profileRoutes load:', e.message); }
+
+  try {
+    const previousDiseaseRoutes = await import('./routes/previousDiseaseRoutes.js').then(m => m.default || m);
+    app.use('/api/previous-diseases', previousDiseaseRoutes);
+  } catch (e) { console.warn('Skipping previousDiseaseRoutes load:', e.message); }
+};
+
+loadRoutes();
 
 // ==========================================
 // 7. ROUTE: PERSONALIZED AI HEALTH CHATBOT
