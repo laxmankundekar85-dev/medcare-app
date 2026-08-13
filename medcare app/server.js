@@ -90,7 +90,7 @@ if (serviceAccount) {
 }
 
 // ==========================================
-// 5. NODEMAILER TRANSPORTER (Port 465 Direct SSL)
+// 5. NODEMAILER TRANSPORTER (Forced IPv4)
 // ==========================================
 const senderEmail = process.env.EMAIL_USER || 'laxmankundekar85@gmail.com';
 const senderPass = process.env.EMAIL_PASS;
@@ -98,7 +98,8 @@ const senderPass = process.env.EMAIL_PASS;
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 465,
-  secure: true, // Direct SSL connection for high reliability on cloud hosts
+  secure: true, // Direct SSL
+  family: 4,    // FORCE IPv4 ONLY (Fixes ENETUNREACH IPv6 issue on Render)
   auth: {
     user: senderEmail,
     pass: senderPass
@@ -326,9 +327,9 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
 });
 
 // ==========================================
-// 8. ROUTE: SEND OTP (INSTANT NON-BLOCKING RESPONSE)
+// 8. ROUTE: SEND OTP (AWAITED DELIVERED RESPONSE)
 // ==========================================
-app.post('/api/auth/send-otp', (req, res) => {
+app.post('/api/auth/send-otp', async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -343,13 +344,10 @@ app.post('/api/auth/send-otp', (req, res) => {
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
     otpStore.set(targetEmail, { otp, expiresAt });
 
-    // Respond IMMEDIATELY to release mobile browser lock
-    res.status(200).json({ success: true, message: 'OTP sent successfully to your email.' });
+    console.log(`📩 Dispatching OTP (${otp}) to "${targetEmail}" via ${senderEmail}...`);
 
-    console.log(`📩 Dispatching background OTP (${otp}) to "${targetEmail}" via ${senderEmail}...`);
-
-    // Send email asynchronously in background
-    transporter.sendMail({
+    // Await email delivery so Render process completes sending cleanly
+    const info = await transporter.sendMail({
       from: `"Medcare Support" <${senderEmail}>`,
       to: targetEmail,
       subject: 'Medcare - Password Reset Verification Code',
@@ -363,17 +361,17 @@ app.post('/api/auth/send-otp', (req, res) => {
           <p>This code will expire in <strong>10 minutes</strong>. Do not share this code with anyone.</p>
         </div>
       `
-    }).then(info => {
-      console.log(`✅ Background OTP Email dispatched successfully: ${info.messageId}`);
-    }).catch(mailErr => {
-      console.error('❌ Background Nodemailer Error:', mailErr.message);
     });
+
+    console.log(`✅ OTP Email dispatched successfully: ${info.messageId}`);
+    return res.status(200).json({ success: true, message: 'OTP sent successfully to your email.' });
 
   } catch (err) {
     console.error('❌ Send OTP Route Error:', err.message);
-    if (!res.headersSent) {
-      return res.status(500).json({ success: false, error: err.message || 'Email delivery failed.' });
-    }
+    return res.status(500).json({ 
+      success: false, 
+      error: `Email delivery failed: ${err.message}` 
+    });
   }
 });
 
