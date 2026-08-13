@@ -1,32 +1,58 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   QrCode, Camera, ChevronRight, Info, 
-  Sparkles, AlertCircle, CheckCircle2, RotateCcw 
+  Sparkles, AlertCircle, CheckCircle2, RotateCcw, X 
 } from 'lucide-react';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { API_BASE_URL } from '../config';
 
 export default function MedicineScanner() {
-  const [activeMode, setActiveMode] = useState(null); // 'qr' | 'photo' | null
+  const [isScanningQR, setIsScanningQR] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [error, setError] = useState(null);
 
-  const fileInputRef = useRef(null);
+  const photoInputRef = useRef(null);
 
-  // Trigger file selection for selected option
-  const handleSelectOption = (mode) => {
-    setActiveMode(mode);
-    setScanResult(null);
-    setError(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
+  // Initialize Real-Time Live QR Scanner Modal
+  useEffect(() => {
+    let scanner = null;
+
+    if (isScanningQR) {
+      scanner = new Html5QrcodeScanner(
+        'qr-reader',
+        { 
+          fps: 10, 
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0 
+        },
+        /* verbose= */ false
+      );
+
+      scanner.render(
+        async (decodedText) => {
+          // Successfully scanned a QR Code!
+          scanner.clear();
+          setIsScanningQR(false);
+          await analyzeScannedText(decodedText);
+        },
+        (errorMessage) => {
+          // QR Scanning in progress...
+        }
+      );
     }
-  };
 
-  // Handle image capture/file selection
-  const handleImageChange = (e) => {
+    return () => {
+      if (scanner) {
+        scanner.clear().catch(() => {});
+      }
+    };
+  }, [isScanningQR]);
+
+  // Handle Photo Selection for Option 2
+  const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setSelectedImage(file);
@@ -36,18 +62,50 @@ export default function MedicineScanner() {
     }
   };
 
-  // Helper: Convert File to Base64
   const convertBase64 = (file) => {
     return new Promise((resolve, reject) => {
-      const fileReader = new FileReader();
-      fileReader.readAsDataURL(file);
-      fileReader.onload = () => resolve(fileReader.result);
-      fileReader.onerror = (err) => reject(err);
+      const reader = new FileReader();
+      fileReaderReadAsDataURL(reader, file, resolve, reject);
     });
   };
 
-  // Send Image to Server AI API
-  const handleAnalyze = async () => {
+  const fileReaderReadAsDataURL = (reader, file, resolve, reject) => {
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (err) => reject(err);
+  };
+
+  // Analyze Decoded Text from QR Camera
+  const analyzeScannedText = async (textData) => {
+    setLoading(true);
+    setError(null);
+    setScanResult(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'guest_user',
+          message: `Please identify and analyze this medicine details extracted from a scanned QR code: "${textData}". Provide medicine name, target diseases, recommended dosage, and key precautions.`
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.reply) {
+        setScanResult(data.reply);
+      } else {
+        setError('Could not process the scanned QR code details.');
+      }
+    } catch (err) {
+      setError('Network error while analyzing QR code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Analyze Uploaded Photo Image
+  const handleAnalyzePhoto = async () => {
     if (!selectedImage) return;
 
     setLoading(true);
@@ -61,7 +119,7 @@ export default function MedicineScanner() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          scanType: activeMode === 'qr' ? 'qr' : 'image',
+          scanType: 'image',
           imageBase64: base64Image
         })
       });
@@ -71,11 +129,10 @@ export default function MedicineScanner() {
       if (response.ok && data.success) {
         setScanResult(data.analysis);
       } else {
-        setError(data.error || 'Failed to identify medication. Please ensure the image/QR is clear.');
+        setError(data.error || 'Failed to identify medication photo.');
       }
     } catch (err) {
-      console.error('Scan Error:', err);
-      setError('Network error while analyzing medicine. Please check your connection.');
+      setError('Network error while analyzing photo.');
     } finally {
       setLoading(false);
     }
@@ -86,18 +143,17 @@ export default function MedicineScanner() {
     setImagePreview(null);
     setScanResult(null);
     setError(null);
-    setActiveMode(null);
+    setIsScanningQR(false);
   };
 
   return (
     <div className="max-w-xl mx-auto space-y-5 pb-36 font-sans px-3 sm:px-4">
-      {/* Hidden File Input */}
+      {/* Hidden File Input for Option 2 (Photo Upload) */}
       <input
         type="file"
         accept="image/*"
-        capture="environment"
-        ref={fileInputRef}
-        onChange={handleImageChange}
+        ref={photoInputRef}
+        onChange={handlePhotoChange}
         className="hidden"
       />
 
@@ -108,28 +164,12 @@ export default function MedicineScanner() {
         </h1>
       </div>
 
-      {/* Hero Circular Graphic */}
+      {/* Hero Graphic */}
       <div className="flex flex-col items-center text-center space-y-3 pt-1">
         <div className="relative flex items-center justify-center w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-teal-50/80 border border-teal-200/60 shadow-inner">
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-teal-100/60 flex items-center justify-center border border-dashed border-teal-300">
             <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-teal-800 text-white flex items-center justify-center shadow-md">
-              <svg 
-                className="w-7 h-7 sm:w-8 sm:h-8" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-              >
-                <path d="M3 7V5a2 2 0 0 1 2-2h2" />
-                <path d="M17 3h2a2 2 0 0 1 2 2v2" />
-                <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
-                <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
-                <rect x="7" y="7" width="10" height="10" rx="1" />
-                <line x1="10" y1="10" x2="14" y2="10" />
-                <line x1="10" y1="14" x2="14" y2="14" />
-              </svg>
+              <QrCode size={30} />
             </div>
           </div>
         </div>
@@ -146,10 +186,14 @@ export default function MedicineScanner() {
 
       {/* Option Cards */}
       <div className="space-y-3 pt-1">
-        {/* Option 1: Scan QR Code */}
+        {/* Option 1: Live QR Scanner Modal Trigger */}
         <button
           type="button"
-          onClick={() => handleSelectOption('qr')}
+          onClick={() => {
+            setScanResult(null);
+            setError(null);
+            setIsScanningQR(true);
+          }}
           className="w-full bg-white hover:bg-teal-50/60 border border-slate-200 rounded-2xl p-3.5 flex items-center justify-between transition group shadow-xs text-left cursor-pointer"
         >
           <div className="flex items-center gap-3">
@@ -169,7 +213,11 @@ export default function MedicineScanner() {
         {/* Option 2: Identify via Photo */}
         <button
           type="button"
-          onClick={() => handleSelectOption('photo')}
+          onClick={() => {
+            setScanResult(null);
+            setError(null);
+            photoInputRef.current?.click();
+          }}
           className="w-full bg-white hover:bg-teal-50/60 border border-slate-200 rounded-2xl p-3.5 flex items-center justify-between transition group shadow-xs text-left cursor-pointer"
         >
           <div className="flex items-center gap-3">
@@ -187,7 +235,32 @@ export default function MedicineScanner() {
         </button>
       </div>
 
-      {/* Image Preview & Analyze Box */}
+      {/* Live QR Camera Scanner Overlay Container */}
+      {isScanningQR && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-5 relative space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="font-bold text-slate-900 text-base">Align QR Code in Frame</h3>
+              <button
+                type="button"
+                onClick={() => setIsScanningQR(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Html5Qrcode Scanner Target Div */}
+            <div id="qr-reader" className="w-full overflow-hidden rounded-2xl"></div>
+
+            <p className="text-xs text-slate-500 text-center">
+              Hold camera steady over the medicine QR code
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Image Preview & Analyze Box (For Option 2) */}
       {imagePreview && (
         <div className="bg-white border border-teal-200 rounded-2xl p-4 space-y-3.5 shadow-xs">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
@@ -207,7 +280,7 @@ export default function MedicineScanner() {
 
           <button
             type="button"
-            onClick={handleAnalyze}
+            onClick={handleAnalyzePhoto}
             disabled={loading}
             className="w-full py-3 bg-teal-800 hover:bg-teal-900 text-white font-bold rounded-xl transition shadow-md disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 text-sm"
           >
@@ -222,6 +295,14 @@ export default function MedicineScanner() {
               </>
             )}
           </button>
+        </div>
+      )}
+
+      {/* Loading Indicator */}
+      {loading && (
+        <div className="bg-teal-50 border border-teal-200 text-teal-800 p-4 rounded-2xl text-center space-y-2">
+          <div className="w-6 h-6 border-2 border-teal-800 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-xs font-bold">Medcare AI is analyzing your QR code details...</p>
         </div>
       )}
 
