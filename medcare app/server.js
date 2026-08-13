@@ -92,20 +92,23 @@ if (serviceAccount) {
 // ==========================================
 // 5. NODEMAILER TRANSPORTER (Non-blocking)
 // ==========================================
+const senderEmail = process.env.EMAIL_USER || 'laxmankundekar85@gmail.com';
+const senderPass = process.env.EMAIL_PASS;
+
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 587,
-  secure: false,
+  secure: false, // TLS on port 587
   auth: {
-    user: process.env.EMAIL_USER || 'laxmankundekar85@gmail.com',
-    pass: process.env.EMAIL_PASS
+    user: senderEmail,
+    pass: senderPass
   },
   tls: {
     rejectUnauthorized: false
   },
-  connectionTimeout: 5000,
-  greetingTimeout: 5000,
-  socketTimeout: 8000
+  connectionTimeout: 8000,
+  greetingTimeout: 8000,
+  socketTimeout: 10000
 });
 
 // In-memory store for OTPs
@@ -343,9 +346,11 @@ app.post('/api/auth/send-otp', (req, res) => {
     // Respond IMMEDIATELY to release mobile browser lock
     res.status(200).json({ success: true, message: 'OTP sent successfully to your email.' });
 
+    console.log(`📩 Dispatching background OTP (${otp}) to "${targetEmail}" via ${senderEmail}...`);
+
     // Send email asynchronously in background
     transporter.sendMail({
-      from: `"Medcare Support" <${process.env.EMAIL_USER || 'laxmankundekar85@gmail.com'}>`,
+      from: `"Medcare Support" <${senderEmail}>`,
       to: targetEmail,
       subject: 'Medcare - Password Reset Verification Code',
       html: `
@@ -358,6 +363,8 @@ app.post('/api/auth/send-otp', (req, res) => {
           <p>This code will expire in <strong>10 minutes</strong>. Do not share this code with anyone.</p>
         </div>
       `
+    }).then(info => {
+      console.log(`✅ Background OTP Email dispatched successfully: ${info.messageId}`);
     }).catch(mailErr => {
       console.error('❌ Background Nodemailer Error:', mailErr.message);
     });
