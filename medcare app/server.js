@@ -26,7 +26,7 @@ import previousDiseaseRoutes from './routes/previousDiseaseRoutes.js';
 const app = express();
 
 // ==========================================
-// 1. MIDDLEWARE & STRICT CORS FOR VERCEL
+// 1. MIDDLEWARE & STRICT CORS FOR MOBILE & VERCEL
 // ==========================================
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -34,10 +34,10 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
-// Handle preflight OPTIONS requests across all routes
+// Express handle preflight OPTIONS requests across all routes
 app.options('*', cors());
 
 // ==========================================
@@ -98,7 +98,10 @@ const transporter = nodemailer.createTransport({
   },
   tls: {
     rejectUnauthorized: false
-  }
+  },
+  connectionTimeout: 10000, // 10 seconds timeout limit
+  greetingTimeout: 10000,
+  socketTimeout: 15000
 });
 
 // Verify SMTP Connection on Startup
@@ -316,7 +319,7 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
 });
 
 // ==========================================
-// 8. ROUTE: SEND OTP (NON-BLOCKING ASYNC RESPONSE)
+// 8. ROUTE: SEND OTP (OPTIMIZED FOR MOBILE CLIENTS)
 // ==========================================
 app.post('/api/auth/send-otp', async (req, res) => {
   console.log('📌 POST /api/auth/send-otp endpoint hit');
@@ -350,13 +353,10 @@ app.post('/api/auth/send-otp', async (req, res) => {
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes expiration
     otpStore.set(targetEmail, { otp, expiresAt });
 
-    console.log(`⚙️ Generated OTP (${otp}). Returning instant response to client...`);
+    console.log(`⚙️ Generated OTP (${otp}). Sending email via Nodemailer...`);
 
-    // RESPOND IMMEDIATELY to prevent Vercel client timeout / connection error
-    res.json({ success: true, message: 'OTP request received. Verification code is being dispatched.' });
-
-    // Send Email asynchronously in the background
-    transporter.sendMail({
+    // Dispatch email synchronously to keep Render instance active
+    const mailInfo = await transporter.sendMail({
       from: `"Medcare Support" <${process.env.EMAIL_USER || 'laxmankundekar85@gmail.com'}>`,
       to: targetEmail,
       subject: 'Medcare - Password Reset Verification Code',
@@ -370,17 +370,14 @@ app.post('/api/auth/send-otp', async (req, res) => {
           <p>This code will expire in <strong>10 minutes</strong>. Do not share this code with anyone.</p>
         </div>
       `
-    }).then(mailInfo => {
-      console.log(`✅ Background Email Sent to ${targetEmail}. MessageID: ${mailInfo.messageId}`);
-    }).catch(mailErr => {
-      console.error(`❌ Background Email Delivery Failed: ${mailErr.message}`);
     });
+
+    console.log(`✅ OTP (${otp}) successfully dispatched to ${targetEmail}. MessageID: ${mailInfo.messageId}`);
+    return res.json({ success: true, message: 'OTP sent successfully to your email.' });
 
   } catch (err) {
     console.error('❌ Send OTP Route Execution Error:', err);
-    if (!res.headersSent) {
-      return res.status(500).json({ success: false, error: err.message || 'Email delivery failed.' });
-    }
+    return res.status(500).json({ success: false, error: err.message || 'Email delivery failed.' });
   }
 });
 
