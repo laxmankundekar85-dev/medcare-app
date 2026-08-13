@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Menu, Bell, X, Home, Calendar, BriefcaseMedical, FileText, 
   User, Settings as SettingsIcon, Pill, Syringe, 
-  Activity, FileClock, Bot, Sparkles
+  Activity, FileClock, Bot
 } from 'lucide-react';
 
 // Import Layout Components
@@ -279,19 +279,6 @@ export default function MedcareApp() {
         {currentView === 'profile' && <Profile onLogout={handleLogout} />}
         {currentView === 'settings' && <Settings onLogout={handleLogout} />}
       </main>
-
-      {/* Floating AI Assistant Action Button (FAB) */}
-      {currentView !== 'chatbot' && (
-        <button
-          type="button"
-          onClick={() => navigateTo('chatbot')}
-          className="fixed bottom-24 right-5 bg-teal-800 hover:bg-teal-900 text-white p-4 rounded-full shadow-2xl z-40 transition-transform transform hover:scale-105 flex items-center justify-center gap-2 cursor-pointer border-2 border-white"
-          title="Open AI Health Assistant"
-        >
-          <Bot size={24} />
-          <Sparkles size={14} className="text-amber-300 fill-amber-300 absolute -top-1 -right-1" />
-        </button>
-      )}
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 w-full bg-slate-50 border-t border-slate-200 flex justify-around p-3 z-10 pb-6">

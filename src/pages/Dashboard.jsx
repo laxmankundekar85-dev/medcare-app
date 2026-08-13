@@ -150,7 +150,9 @@ export default function Dashboard({ onNavigate }) {
 
   const handleQuickAction = (action) => {
     setIsFabMenuOpen(false);
-    if (action === 'vitals') {
+    if (action === 'chatbot') {
+      if (onNavigate) onNavigate('chatbot');
+    } else if (action === 'vitals') {
       setIsVitalsModalOpen(true);
     } else if (action === 'appointment') {
       alert('Opening new appointment scheduler...');
@@ -212,14 +214,8 @@ export default function Dashboard({ onNavigate }) {
     }
   };
 
-  const handleOpenChatbot = () => {
-    if (onNavigate) {
-      onNavigate('chatbot');
-    }
-  };
-
   return (
-    <div className="space-y-6 pb-24 relative font-sans" onClick={() => setIsFabMenuOpen(false)}>
+    <div className="space-y-6 pb-28 relative font-sans" onClick={() => setIsFabMenuOpen(false)}>
       {/* Top Banner Card */}
       <div className="flex justify-between items-start bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <div>
@@ -316,26 +312,24 @@ export default function Dashboard({ onNavigate }) {
         </button>
       </div>
 
-      {/* Floating Fast-Access Controls (Bottom Right) */}
-      <div className="fixed bottom-24 right-6 z-50 flex flex-col items-end gap-3" onClick={(e) => e.stopPropagation()}>
-        {/* Fast Access AI Chatbot Floating Button */}
-        <button
-          type="button"
-          onClick={handleOpenChatbot}
-          title="Open Medcare AI Assistant"
-          className="relative w-14 h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center shadow-xl transition transform hover:scale-110 active:scale-95 cursor-pointer group border-2 border-white"
-        >
-          <Bot size={26} className="group-hover:rotate-12 transition-transform duration-200" />
-          <Sparkles size={14} className="absolute top-1 right-1 text-amber-300 animate-pulse" />
-          <span className="absolute top-0 right-0 flex h-3.5 w-3.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500 border-2 border-white"></span>
-          </span>
-        </button>
-
-        {/* Quick Action FAB Menu */}
+      {/* Floating Action Control (Positioned cleanly above bottom nav) */}
+      <div className="fixed bottom-20 right-5 z-40" onClick={(e) => e.stopPropagation()}>
+        {/* Expanded Quick Action & AI Menu */}
         {isFabMenuOpen && (
-          <div className="absolute bottom-16 right-0 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 w-52 space-y-1 mb-2">
+          <div className="absolute bottom-16 right-0 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 w-56 space-y-1 mb-2 animate-in fade-in slide-in-from-bottom-2 duration-150">
+            {/* Featured AI Assistant Option */}
+            <button 
+              type="button"
+              onClick={() => handleQuickAction('chatbot')}
+              className="w-full text-left px-3 py-2.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition flex items-center gap-2.5 cursor-pointer border border-emerald-100"
+            >
+              <Bot size={18} className="text-emerald-700" />
+              <span className="flex-1">Ask AI Assistant</span>
+              <Sparkles size={14} className="text-amber-500 fill-amber-400" />
+            </button>
+
+            <div className="border-t border-slate-100 my-1"></div>
+
             <button 
               type="button"
               onClick={() => handleQuickAction('profile')}
@@ -367,12 +361,14 @@ export default function Dashboard({ onNavigate }) {
           </div>
         )}
 
+        {/* Primary Floating Action Button */}
         <button 
           type="button"
           onClick={() => setIsFabMenuOpen(!isFabMenuOpen)}
-          className="w-14 h-14 bg-teal-800 hover:bg-teal-900 text-white rounded-full flex items-center justify-center shadow-lg transition transform hover:scale-105 active:scale-95 cursor-pointer"
+          className="w-14 h-14 bg-teal-800 hover:bg-teal-900 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-white transition transform active:scale-95 cursor-pointer"
+          title="Quick Actions & AI"
         >
-          <Plus size={24} className={`transition-transform duration-200 ${isFabMenuOpen ? 'rotate-45' : ''}`} />
+          <Plus size={26} className={`transition-transform duration-200 ${isFabMenuOpen ? 'rotate-45' : ''}`} />
         </button>
       </div>
 
