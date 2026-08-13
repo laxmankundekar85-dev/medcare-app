@@ -100,7 +100,6 @@ export default function Login({ onLogin }) {
     }
   };
 
-  // STRICT BACKEND OTP DISPATCH (NO FIREBASE LINK FALLBACK)
   const handleSendOTP = async (e) => {
     e.preventDefault();
     setError('');
@@ -132,11 +131,16 @@ export default function Login({ onLogin }) {
         setOtpSent(true);
         setSuccessMessage('A 6-digit verification code has been sent to your email.');
       } else {
-        setError(data.error || 'Failed to send OTP code.');
+        // Filter out raw backend Firebase initialization error messages
+        if (data.error && data.error.includes('Firebase error')) {
+          setError('Backend setup error. Please contact administrator or check server environment variables.');
+        } else {
+          setError(data.error || 'Failed to send OTP code.');
+        }
       }
     } catch (err) {
       console.error("Backend connection error:", err);
-      setError(`Unable to connect to backend service. Please try again in a few seconds.`);
+      setError(`Unable to connect to backend server at ${API_BASE_URL}`);
     } finally {
       setLoading(false);
     }
