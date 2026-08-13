@@ -5,7 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import nodemailer from 'nodemailer';
-import { initializeApp, cert } from 'firebase-admin/app';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { createRequire } from 'module';
 
@@ -69,10 +69,12 @@ if (process.env.FIREBASE_PRIVATE_KEY) {
 
 if (serviceAccount) {
   try {
-    initializeApp({
-      credential: cert(serviceAccount)
-    });
-    console.log('🔥 Firebase Admin SDK initialized');
+    if (getApps().length === 0) {
+      initializeApp({
+        credential: cert(serviceAccount)
+      });
+      console.log('🔥 Firebase Admin SDK initialized');
+    }
   } catch (err) {
     console.error('❌ Firebase Admin SDK Initialization Error:', err.message);
   }
@@ -347,17 +349,16 @@ app.post('/api/auth/send-otp', async (req, res) => {
 
   const targetEmail = email.toLowerCase().trim();
 
-  // Safely check Firebase Admin without crashing if not initialized
-  try {
-    const adminAuth = getAuth();
-    if (adminAuth) {
-      await adminAuth.getUserByEmail(targetEmail);
+  // Safely check Firebase Admin if initialized
+  if (getApps().length > 0) {
+    try {
+      await getAuth().getUserByEmail(targetEmail);
+    } catch (firebaseErr) {
+      if (firebaseErr.code === 'auth/user-not-found') {
+        return res.status(404).json({ error: 'No account registered with this email address.' });
+      }
+      console.warn('⚠️ Firebase Admin lookup error on server:', firebaseErr.message);
     }
-  } catch (firebaseErr) {
-    if (firebaseErr.code === 'auth/user-not-found') {
-      return res.status(404).json({ error: 'No account registered with this email address.' });
-    }
-    console.warn('⚠️ Firebase Admin lookup bypassed on server:', firebaseErr.message);
   }
 
   // Generate OTP
@@ -419,10 +420,9 @@ app.post('/api/auth/verify-otp-reset', async (req, res) => {
   }
 
   try {
-    const adminAuth = getAuth();
-    if (adminAuth) {
-      const user = await adminAuth.getUserByEmail(targetEmail);
-      await adminAuth.updateUser(user.uid, { password: newPassword });
+    if (getApps().length > 0) {
+      const user = await getAuth().getUserByEmail(targetEmail);
+      await getAuth().updateUser(user.uid, { password: newPassword });
     }
 
     otpStore.delete(targetEmail);
