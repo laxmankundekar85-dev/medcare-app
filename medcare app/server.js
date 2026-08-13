@@ -83,12 +83,12 @@ if (serviceAccount) {
 }
 
 // ==========================================
-// 4. NODEMAILER TRANSPORTER (Port 465 SSL)
+// 4. NODEMAILER TRANSPORTER (Port 587 TLS)
 // ==========================================
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
+  port: 587,
+  secure: false, // Must be false for Port 587 (uses STARTTLS)
   auth: {
     user: process.env.EMAIL_USER || 'laxmankundekar85@gmail.com',
     pass: process.env.EMAIL_PASS
