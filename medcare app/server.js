@@ -25,7 +25,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
-app.options('*', cors());
+// Use regex match to prevent path-to-regexp parsing errors on route OPTIONS preflight
+app.options(/(.*)/, cors());
 
 // ==========================================
 // 2. HEALTH & WAKEUP ROUTES (DEFINED FIRST)
