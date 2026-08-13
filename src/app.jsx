@@ -30,6 +30,17 @@ export default function MedcareApp() {
   // Reference for notification container to handle clicking outside
   const notificationRef = useRef(null);
 
+  // =========================================================
+  // BACKGROUND WAKEUP PING FOR RENDER FREE TIER
+  // =========================================================
+  useEffect(() => {
+    // Fire a silent background ping when App loads to wake up Render
+    fetch(`${API_BASE_URL}/api/ping`, { method: 'GET' })
+      .catch(() => {
+        // Silent catch for background ping
+      });
+  }, []);
+
   // Helper to read current logged-in user ID
   const getCurrentUserId = () => {
     try {
