@@ -5,8 +5,7 @@ import {
   googleProvider, 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
-  signInWithPopup,
-  sendPasswordResetEmail
+  signInWithPopup 
 } from '../firebase';
 import { API_BASE_URL } from '../config';
 
@@ -120,11 +119,11 @@ export default function Login({ onLogin }) {
     setLoading(true);
 
     try {
-      // 1. Try custom backend OTP API first
+      // Direct call to custom backend OTP API
       const response = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email: email.toLowerCase().trim() })
       });
 
       const data = await response.json();
@@ -132,20 +131,12 @@ export default function Login({ onLogin }) {
       if (response.ok && data.success) {
         setOtpSent(true);
         setSuccessMessage('A 6-digit verification code has been sent to your email.');
-        setLoading(false);
-        return;
+      } else {
+        setError(data.error || 'Failed to send OTP code.');
       }
     } catch (err) {
-      console.warn("Custom backend OTP service unreachable. Proceeding with Firebase Native Reset...", err);
-    }
-
-    // 2. Guaranteed Fallback: Send Firebase Native Password Reset Email using 'auth' instance
-    try {
-      await sendPasswordResetEmail(auth, email);
-      setSuccessMessage('A password reset link has been sent directly to your email inbox!');
-    } catch (fbErr) {
-      console.error("Firebase Password Reset Error:", fbErr);
-      setError(fbErr.message || 'Unable to send password reset email. Please try again.');
+      console.error("Backend OTP error:", err);
+      setError(`Server error. Unable to connect to backend at ${API_BASE_URL}`);
     } finally {
       setLoading(false);
     }
@@ -172,7 +163,7 @@ export default function Login({ onLogin }) {
       const response = await fetch(`${API_BASE_URL}/api/auth/verify-otp-reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp, newPassword })
+        body: JSON.stringify({ email: email.toLowerCase().trim(), otp, newPassword })
       });
 
       const data = await response.json();
@@ -272,7 +263,7 @@ export default function Login({ onLogin }) {
                   disabled={loading}
                   className="w-full bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl font-medium mt-2 flex justify-center items-center gap-2 transition shadow-sm disabled:opacity-50 cursor-pointer"
                 >
-                  <span>{loading ? 'Sending Request...' : 'Send Verification OTP'}</span>
+                  <span>{loading ? 'Sending OTP...' : 'Send Verification OTP'}</span>
                 </button>
               </form>
             ) : (
