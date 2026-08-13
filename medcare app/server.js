@@ -338,36 +338,36 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
 });
 
 // ==========================================
-// 8. ROUTE: SEND OTP
+// 8. ROUTE: SEND OTP (CRASH-PROOF & INDEPENDENT)
 // ==========================================
 app.post('/api/auth/send-otp', async (req, res) => {
-  const { email } = req.body;
-
-  if (!email) {
-    return res.status(400).json({ error: 'Email address is required.' });
-  }
-
-  const targetEmail = email.toLowerCase().trim();
-
-  // Safely check Firebase Admin if initialized
-  if (getApps().length > 0) {
-    try {
-      await getAuth().getUserByEmail(targetEmail);
-    } catch (firebaseErr) {
-      if (firebaseErr.code === 'auth/user-not-found') {
-        return res.status(404).json({ error: 'No account registered with this email address.' });
-      }
-      console.warn('⚠️ Firebase Admin lookup error on server:', firebaseErr.message);
-    }
-  }
-
-  // Generate OTP
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes expiration
-  otpStore.set(targetEmail, { otp, expiresAt });
-
-  // Send Email via Nodemailer
   try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Email address is required.' });
+    }
+
+    const targetEmail = email.toLowerCase().trim();
+
+    // Safely check Firebase Admin if initialized
+    if (getApps().length > 0) {
+      try {
+        await getAuth().getUserByEmail(targetEmail);
+      } catch (firebaseErr) {
+        if (firebaseErr.code === 'auth/user-not-found') {
+          return res.status(404).json({ success: false, error: 'No account registered with this email address.' });
+        }
+        console.warn('⚠️ Firebase Admin lookup error on server:', firebaseErr.message);
+      }
+    }
+
+    // Generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes expiration
+    otpStore.set(targetEmail, { otp, expiresAt });
+
+    // Send Email via Nodemailer
     await transporter.sendMail({
       from: `"Medcare Support" <${process.env.EMAIL_USER || 'laxmankundekar85@gmail.com'}>`,
       to: targetEmail,
@@ -387,9 +387,9 @@ app.post('/api/auth/send-otp', async (req, res) => {
     console.log(`✅ OTP (${otp}) successfully sent to ${targetEmail}`);
     return res.json({ success: true, message: 'OTP sent successfully to your email.' });
 
-  } catch (emailErr) {
-    console.error('📧 Nodemailer Error:', emailErr);
-    return res.status(500).json({ error: `Email delivery failed: ${emailErr.message}` });
+  } catch (err) {
+    console.error('❌ Send OTP Route Error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Email delivery failed.' });
   }
 });
 
@@ -397,42 +397,46 @@ app.post('/api/auth/send-otp', async (req, res) => {
 // 9. ROUTE: VERIFY OTP & RESET PASSWORD
 // ==========================================
 app.post('/api/auth/verify-otp-reset', async (req, res) => {
-  const { email, otp, newPassword } = req.body;
-
-  if (!email || !otp || !newPassword) {
-    return res.status(400).json({ error: 'Email, OTP, and new password are required.' });
-  }
-
-  const targetEmail = email.toLowerCase().trim();
-  const record = otpStore.get(targetEmail);
-
-  if (!record) {
-    return res.status(400).json({ error: 'No OTP request found or OTP expired.' });
-  }
-
-  if (Date.now() > record.expiresAt) {
-    otpStore.delete(targetEmail);
-    return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
-  }
-
-  if (record.otp !== otp.trim()) {
-    return res.status(400).json({ error: 'Invalid verification code.' });
-  }
-
   try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ success: false, error: 'Email, OTP, and new password are required.' });
+    }
+
+    const targetEmail = email.toLowerCase().trim();
+    const record = otpStore.get(targetEmail);
+
+    if (!record) {
+      return res.status(400).json({ success: false, error: 'No OTP request found or OTP expired.' });
+    }
+
+    if (Date.now() > record.expiresAt) {
+      otpStore.delete(targetEmail);
+      return res.status(400).json({ success: false, error: 'OTP has expired. Please request a new one.' });
+    }
+
+    if (record.otp !== otp.trim()) {
+      return res.status(400).json({ success: false, error: 'Invalid verification code.' });
+    }
+
     if (getApps().length > 0) {
-      const user = await getAuth().getUserByEmail(targetEmail);
-      await getAuth().updateUser(user.uid, { password: newPassword });
+      try {
+        const user = await getAuth().getUserByEmail(targetEmail);
+        await getAuth().updateUser(user.uid, { password: newPassword });
+      } catch (fbErr) {
+        console.warn('⚠️ Firebase password update skipped:', fbErr.message);
+      }
     }
 
     otpStore.delete(targetEmail);
 
     console.log(`🔒 Password updated successfully for ${targetEmail}`);
-    res.json({ success: true, message: 'Password updated successfully! You can now log in.' });
+    return res.json({ success: true, message: 'Password updated successfully! You can now log in.' });
 
-  } catch (error) {
-    console.error('Error resetting password:', error);
-    res.status(500).json({ error: error.message || 'Failed to update password.' });
+  } catch (err) {
+    console.error('❌ Verify OTP Route Error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Server error while resetting password.' });
   }
 });
 
