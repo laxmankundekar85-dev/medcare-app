@@ -291,6 +291,18 @@ export default function MedcareApp() {
         {currentView === 'settings' && <Settings onLogout={handleLogout} />}
       </main>
 
+      {/* Floating AI Assistant Action Button (Displayed on all views except chatbot) */}
+      {currentView !== 'chatbot' && (
+        <button
+          type="button"
+          onClick={() => navigateTo('chatbot')}
+          className="fixed bottom-20 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-teal-800 text-white shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer border-2 border-slate-50"
+          aria-label="Open AI Assistant"
+        >
+          <Bot size={28} />
+        </button>
+      )}
+
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 w-full bg-slate-50 border-t border-slate-200 flex justify-around p-3 z-10 pb-6">
         <BottomNavItem icon={<Home />} label="Home" active={currentView === 'dashboard'} onClick={() => navigateTo('dashboard')} />
