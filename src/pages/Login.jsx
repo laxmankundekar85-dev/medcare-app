@@ -5,7 +5,8 @@ import {
   googleProvider, 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
-  signInWithPopup 
+  signInWithPopup,
+  sendPasswordResetEmail
 } from '../firebase';
 import { API_BASE_URL } from '../config';
 
@@ -119,6 +120,7 @@ export default function Login({ onLogin }) {
     setLoading(true);
 
     try {
+      // First attempt custom OTP endpoint on backend
       const response = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -131,10 +133,17 @@ export default function Login({ onLogin }) {
         setOtpSent(true);
         setSuccessMessage('A 6-digit verification code has been sent to your email.');
       } else {
-        setError(data.error || 'Failed to send OTP.');
+        setError(data.error || 'Failed to send OTP code via server.');
       }
     } catch (err) {
-      setError(`Server error. Unable to connect to backend at ${API_BASE_URL}`);
+      // Fallback: If custom server endpoint is unreachable, send Firebase's native password reset email
+      console.warn("Backend OTP service unavailable, attempting Firebase fallback reset...", err);
+      try {
+        await sendPasswordResetEmail(auth, email);
+        setSuccessMessage('Password reset link sent directly to your email via Firebase! Please check your inbox.');
+      } catch (fbErr) {
+        setError(fbErr.message || `Server error. Unable to connect to backend at ${API_BASE_URL}`);
+      }
     } finally {
       setLoading(false);
     }
