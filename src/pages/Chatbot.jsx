@@ -120,9 +120,9 @@ export default function Chatbot() {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 pb-28 font-sans flex flex-col h-[calc(100vh-120px)]">
-      {/* Header */}
-      <div className="flex items-center justify-between bg-white border border-slate-200 p-4 rounded-3xl shadow-sm mb-4">
+    <div className="max-w-4xl mx-auto font-sans flex flex-col h-[calc(100dvh-130px)] bg-slate-50 rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+      {/* Fixed Header */}
+      <div className="flex items-center justify-between bg-white border-b border-slate-100 p-4 shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-teal-100 text-teal-800 rounded-2xl flex items-center justify-center font-bold">
             <Bot size={22} />
@@ -144,8 +144,8 @@ export default function Chatbot() {
         </button>
       </div>
 
-      {/* Messages Window */}
-      <div className="flex-1 bg-white border border-slate-200 rounded-3xl p-4 overflow-y-auto space-y-4 shadow-sm">
+      {/* Scrollable Messages Window */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg, index) => (
           <div 
             key={index} 
@@ -157,10 +157,10 @@ export default function Chatbot() {
               {msg.sender === 'user' ? <User size={16} /> : <Bot size={16} />}
             </div>
 
-            <div className={`max-w-[80%] p-3.5 rounded-2xl text-sm leading-relaxed ${
+            <div className={`max-w-[80%] p-3.5 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
               msg.sender === 'user' 
-                ? 'bg-teal-800 text-white rounded-tr-none' 
-                : 'bg-slate-100 text-slate-800 rounded-tl-none border border-slate-200/60'
+                ? 'bg-teal-800 text-white rounded-tr-none shadow-sm' 
+                : 'bg-white text-slate-800 rounded-tl-none border border-slate-200/80 shadow-sm'
             }`}>
               {msg.text}
             </div>
@@ -172,44 +172,49 @@ export default function Chatbot() {
             <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center">
               <Bot size={16} />
             </div>
-            <div className="bg-slate-100 border border-slate-200/60 p-3 rounded-2xl rounded-tl-none text-xs text-slate-500 animate-pulse flex items-center gap-2">
-              <span>Medcare AI is analyzing your query...</span>
+            <div className="bg-white border border-slate-200/80 p-3 rounded-2xl rounded-tl-none text-xs text-slate-500 flex items-center gap-2 shadow-sm">
+              <span className="w-2 h-2 bg-teal-600 rounded-full animate-bounce"></span>
+              <span className="w-2 h-2 bg-teal-600 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+              <span className="w-2 h-2 bg-teal-600 rounded-full animate-bounce [animation-delay:0.4s]"></span>
             </div>
           </div>
         )}
         <div ref={chatEndRef} />
       </div>
 
-      {/* Suggested Quick Prompts */}
-      <div className="flex gap-2 overflow-x-auto py-3 no-scrollbar">
-        {quickPrompts.map((prompt, idx) => (
-          <button
-            key={idx}
-            onClick={() => handleSendMessage(prompt)}
-            className="bg-teal-50 border border-teal-200 text-teal-800 text-xs font-medium px-3 py-1.5 rounded-full whitespace-nowrap hover:bg-teal-100 transition cursor-pointer"
-          >
-            {prompt}
-          </button>
-        ))}
-      </div>
+      {/* Docked Input & Suggestions Footer */}
+      <div className="p-3 bg-white border-t border-slate-100 shrink-0 space-y-2.5">
+        {/* Suggested Quick Prompts */}
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {quickPrompts.map((prompt, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleSendMessage(prompt)}
+              className="bg-teal-50 border border-teal-200 text-teal-800 text-xs font-medium px-3 py-1.5 rounded-full whitespace-nowrap hover:bg-teal-100 transition cursor-pointer"
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
 
-      {/* Input Form */}
-      <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="relative flex items-center">
-        <input 
-          type="text" 
-          placeholder="Ask anything about your health or medications..." 
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          className="w-full bg-white border border-slate-200 rounded-2xl pl-4 pr-12 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-700 shadow-sm"
-        />
-        <button 
-          type="submit" 
-          disabled={!input.trim() || loading}
-          className="absolute right-2 bg-teal-800 hover:bg-teal-900 text-white p-2.5 rounded-xl transition disabled:opacity-40 cursor-pointer"
-        >
-          <Send size={18} />
-        </button>
-      </form>
+        {/* Input Form */}
+        <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="relative flex items-center">
+          <input 
+            type="text" 
+            placeholder="Ask anything about your health or medications..." 
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-4 pr-12 py-3.5 text-sm focus:outline-none focus:border-teal-700 shadow-sm text-slate-800 placeholder-slate-400"
+          />
+          <button 
+            type="submit" 
+            disabled={!input.trim() || loading}
+            className="absolute right-2 bg-teal-800 hover:bg-teal-900 text-white p-2.5 rounded-xl transition disabled:opacity-40 cursor-pointer"
+          >
+            <Send size={18} />
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
