@@ -76,45 +76,25 @@ export default function MedicineScanner() {
     });
   };
 
-  // Analyze Decoded Text from QR Camera
+  // Analyze Decoded Text from QR Camera via Dedicated /api/scan-qr-text Route
   const analyzeScannedText = async (textData) => {
     setLoading(true);
     setError(null);
     setScanResult(null);
 
     try {
-      const promptText = `Analyze this scanned pharmaceutical QR string or drug details: "${textData}". 
-
-Please provide a structured clinical breakdown:
-💊 **Identified Medicine & Strength**
-🏥 **Primary Usage & Targeted Diseases/Symptoms**
-⚖️ **Typical Dosage Guidelines**
-⚠️ **Essential Precautions & Safety Warnings**
-
-Important Note: Do not summarize logged patient profile records. Focus strictly on explaining the drug from the scanned input string above.`;
-
-      const response = await fetch(`${API_BASE_URL}/api/chat`, {
+      const response = await fetch(`${API_BASE_URL}/api/scan-qr-text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: 'guest_user',
-          message: promptText
-        })
+        body: JSON.stringify({ textData })
       });
 
       const data = await response.json();
-      
-      // Filter out generic profile fallbacks if Gemini API fallback triggers
-      if (
-        response.ok && 
-        data.reply && 
-        !data.reply.includes('Your current active Medcare medications')
-      ) {
-        setScanResult(data.reply);
+
+      if (response.ok && data.success && data.analysis) {
+        setScanResult(data.analysis);
       } else {
-        setScanResult(
-          `💊 **Scanned Code Data:**\n"${textData}"\n\n*(Note: Ensure your GEMINI_API_KEY is active in your backend environment variables for full AI analysis.)*`
-        );
+        setError(data.error || 'Could not analyze scanned QR code details.');
       }
     } catch (err) {
       console.error('QR Processing Error:', err);
