@@ -37,7 +37,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
-// Handle preflight OPTIONS requests across all routes
+// Express handle preflight OPTIONS requests across all routes
 app.options('*', cors());
 
 // ==========================================
@@ -99,7 +99,7 @@ const transporter = nodemailer.createTransport({
   tls: {
     rejectUnauthorized: false
   },
-  connectionTimeout: 8000, // 8 seconds limit to prevent hanging
+  connectionTimeout: 8000,
   greetingTimeout: 8000,
   socketTimeout: 10000
 });
@@ -315,7 +315,7 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
 });
 
 // ==========================================
-// 8. ROUTE: SEND OTP (FAST DIRECT DELIVERY)
+// 8. ROUTE: SEND OTP (INSTANT NON-BLOCKING RESPONSE)
 // ==========================================
 app.post('/api/auth/send-otp', async (req, res) => {
   console.log('📌 POST /api/auth/send-otp endpoint hit');
@@ -334,8 +334,11 @@ app.post('/api/auth/send-otp', async (req, res) => {
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
     otpStore.set(targetEmail, { otp, expiresAt });
 
-    // Send Email directly via Nodemailer
-    const mailInfo = await transporter.sendMail({
+    // Respond IMMEDIATELY to release mobile browser lock
+    res.status(200).json({ success: true, message: 'OTP sent successfully to your email.' });
+
+    // Send email in background asynchronously
+    transporter.sendMail({
       from: `"Medcare Support" <${process.env.EMAIL_USER || 'laxmankundekar85@gmail.com'}>`,
       to: targetEmail,
       subject: 'Medcare - Password Reset Verification Code',
@@ -349,14 +352,17 @@ app.post('/api/auth/send-otp', async (req, res) => {
           <p>This code will expire in <strong>10 minutes</strong>. Do not share this code with anyone.</p>
         </div>
       `
+    }).then(mailInfo => {
+      console.log(`✅ Background OTP Email dispatched: ${mailInfo.messageId}`);
+    }).catch(mailErr => {
+      console.error('❌ Background Nodemailer Error:', mailErr.message);
     });
-
-    console.log(`✅ OTP (${otp}) successfully dispatched to ${targetEmail}. MessageID: ${mailInfo.messageId}`);
-    return res.status(200).json({ success: true, message: 'OTP sent successfully to your email.' });
 
   } catch (err) {
     console.error('❌ Send OTP Route Execution Error:', err.message);
-    return res.status(500).json({ success: false, error: err.message || 'Email delivery failed.' });
+    if (!res.headersSent) {
+      return res.status(500).json({ success: false, error: err.message || 'Email delivery failed.' });
+    }
   }
 });
 
