@@ -1,5 +1,5 @@
 import dns from 'dns';
-// Force IPv4 resolution across Node.js to prevent Render IPv6 socket errors
+// Force Node.js default DNS order to IPv4 first
 dns.setDefaultResultOrder('ipv4first');
 
 import dotenv from 'dotenv';
@@ -92,7 +92,7 @@ if (serviceAccount) {
 }
 
 // ==========================================
-// 5. NODEMAILER TRANSPORTER SETUP (Strict IPv4 Lookup Override)
+// 5. NODEMAILER TRANSPORTER SETUP (STRICT IPv4 FORCE)
 // ==========================================
 const senderEmail = process.env.EMAIL_USER || 'laxmankundekar85@gmail.com';
 const senderPass = process.env.EMAIL_PASS;
@@ -105,16 +105,19 @@ const transporter = nodemailer.createTransport({
     user: senderEmail,
     pass: senderPass
   },
-  // Force DNS lookup to resolve strictly IPv4 to prevent Render ENETUNREACH socket errors
-  lookup: (hostname, options, callback) => {
-    dns.lookup(hostname, { family: 4 }, callback);
+  // Custom DNS lookup that explicitly mandates IPv4 (family 4)
+  getAddrInfo: (hostname, cb) => {
+    dns.lookup(hostname, { family: 4 }, (err, address) => {
+      if (err) return cb(err);
+      cb(null, address, 4);
+    });
   },
   tls: {
     rejectUnauthorized: false
   },
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 15000
+  connectionTimeout: 15000,
+  greetingTimeout: 15000,
+  socketTimeout: 20000
 });
 
 // In-memory store for OTPs
@@ -303,7 +306,7 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
 });
 
 // ==========================================
-// 8. ROUTE: SEND OTP (INSTANT MOBILE RESPONSE + LOG BACKUP)
+// 8. ROUTE: SEND OTP
 // ==========================================
 app.post('/api/auth/send-otp', (req, res) => {
   try {
@@ -327,10 +330,10 @@ app.post('/api/auth/send-otp', (req, res) => {
     console.log(`   VERIFICATION CODE: ${otp}`);
     console.log(`==========================================`);
 
-    // Respond IMMEDIATELY to release mobile browser lock & prevent preflight timeout
+    // Respond IMMEDIATELY to prevent mobile CORS timeouts
     res.status(200).json({ success: true, message: 'OTP sent successfully to your email.' });
 
-    // Dispatch Nodemailer asynchronously in background
+    // Send email asynchronously in background
     transporter.sendMail({
       from: `"Medcare Support" <${senderEmail}>`,
       to: targetEmail,
