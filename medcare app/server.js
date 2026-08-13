@@ -117,10 +117,14 @@ transporter.verify((error) => {
 const otpStore = new Map();
 
 // ==========================================
-// 5. HEALTH CHECK ROUTE
+// 5. HEALTH CHECK & WAKEUP ROUTES
 // ==========================================
 app.get('/', (req, res) => {
   res.send('Medcare Backend API is running...');
+});
+
+app.get('/api/ping', (req, res) => {
+  res.status(200).json({ status: 'awake', timestamp: Date.now() });
 });
 
 app.get('/api/health', (req, res) => {
