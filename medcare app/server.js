@@ -1,14 +1,10 @@
-import dns from 'dns';
-// Force Node.js default DNS order to IPv4 first
-dns.setDefaultResultOrder('ipv4first');
-
 import dotenv from 'dotenv';
 dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
-import nodemailer from 'nodemailer';
+import https from 'https';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { createRequire } from 'module';
@@ -76,7 +72,7 @@ if (process.env.FIREBASE_PRIVATE_KEY) {
   try {
     serviceAccount = require('./serviceAccountKey.json');
   } catch (err) {
-    console.warn('⚠️ serviceAccountKey.json not found locally.');
+    // Expected on Render production deployments where key is supplied via ENV vars
   }
 }
 
@@ -91,40 +87,69 @@ if (serviceAccount) {
   }
 }
 
-// ==========================================
-// 5. NODEMAILER TRANSPORTER SETUP (STRICT IPv4 FORCE)
-// ==========================================
-const senderEmail = process.env.EMAIL_USER || 'laxmankundekar85@gmail.com';
-const senderPass = process.env.EMAIL_PASS;
-
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // TLS
-  auth: {
-    user: senderEmail,
-    pass: senderPass
-  },
-  // Custom DNS lookup that explicitly mandates IPv4 (family 4)
-  getAddrInfo: (hostname, cb) => {
-    dns.lookup(hostname, { family: 4 }, (err, address) => {
-      if (err) return cb(err);
-      cb(null, address, 4);
-    });
-  },
-  tls: {
-    rejectUnauthorized: false
-  },
-  connectionTimeout: 15000,
-  greetingTimeout: 15000,
-  socketTimeout: 20000
-});
-
 // In-memory store for OTPs
 const otpStore = new Map();
 
+// Helper function: Send email via Brevo REST API (Over HTTPS Port 443 - Never Blocked by Render)
+const sendEmailViaHTTPS = (toEmail, otpCode) => {
+  return new Promise((resolve, reject) => {
+    const apiKey = process.env.BREVO_API_KEY;
+    const sender = process.env.EMAIL_USER || 'laxmankundekar85@gmail.com';
+
+    if (!apiKey) {
+      console.warn('⚠️ BREVO_API_KEY missing in environment variables. Skipped HTTPS email delivery.');
+      return resolve({ skipped: true });
+    }
+
+    const payload = JSON.stringify({
+      sender: { name: "Medcare Support", email: sender },
+      to: [{ email: toEmail }],
+      subject: "Medcare - Password Reset Verification Code",
+      htmlContent: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: #0d9488;">Medcare Password Reset</h2>
+          <p>You requested to reset your password. Use the verification code below:</p>
+          <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; width: 220px; margin: 20px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #0f766e;">${otpCode}</span>
+          </div>
+          <p>This code will expire in <strong>10 minutes</strong>. Do not share this code with anyone.</p>
+        </div>
+      `
+    });
+
+    const options = {
+      hostname: 'api.brevo.com',
+      port: 443,
+      path: '/v3/smtp/email',
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': apiKey,
+        'content-type': 'application/json',
+        'content-length': Buffer.byteLength(payload)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let responseBody = '';
+      res.on('data', (chunk) => { responseBody += chunk; });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(JSON.parse(responseBody));
+        } else {
+          reject(new Error(`HTTPS API Error ${res.statusCode}: ${responseBody}`));
+        }
+      });
+    });
+
+    req.on('error', (err) => reject(err));
+    req.write(payload);
+    req.end();
+  });
+};
+
 // ==========================================
-// 6. SAFE DYNAMIC ROUTE IMPORTS
+// 5. SAFE DYNAMIC ROUTE IMPORTS
 // ==========================================
 const loadRoutes = async () => {
   try {
@@ -166,7 +191,7 @@ const loadRoutes = async () => {
 loadRoutes();
 
 // ==========================================
-// 7. ROUTE: PERSONALIZED AI HEALTH CHATBOT
+// 6. ROUTE: PERSONALIZED AI HEALTH CHATBOT
 // ==========================================
 app.post('/api/chat', async (req, res) => {
   try {
@@ -306,7 +331,7 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
 });
 
 // ==========================================
-// 8. ROUTE: SEND OTP
+// 7. ROUTE: SEND OTP (HTTPS REST API + TERMINAL LOG BACKUP)
 // ==========================================
 app.post('/api/auth/send-otp', (req, res) => {
   try {
@@ -330,29 +355,19 @@ app.post('/api/auth/send-otp', (req, res) => {
     console.log(`   VERIFICATION CODE: ${otp}`);
     console.log(`==========================================`);
 
-    // Respond IMMEDIATELY to prevent mobile CORS timeouts
+    // Respond IMMEDIATELY to client UI to prevent mobile preflight timeouts
     res.status(200).json({ success: true, message: 'OTP sent successfully to your email.' });
 
-    // Send email asynchronously in background
-    transporter.sendMail({
-      from: `"Medcare Support" <${senderEmail}>`,
-      to: targetEmail,
-      subject: 'Medcare - Password Reset Verification Code',
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-          <h2 style="color: #0d9488;">Medcare Password Reset</h2>
-          <p>You requested to reset your password. Use the verification code below:</p>
-          <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; width: 220px; margin: 20px 0;">
-            <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #0f766e;">${otp}</span>
-          </div>
-          <p>This code will expire in <strong>10 minutes</strong>. Do not share this code with anyone.</p>
-        </div>
-      `
-    }).then(info => {
-      console.log(`✅ Sent via Nodemailer: ${info.messageId}`);
-    }).catch(nErr => {
-      console.error('❌ Nodemailer Background Error:', nErr.message);
-    });
+    // Dispatch email over HTTPS REST API in background
+    sendEmailViaHTTPS(targetEmail, otp)
+      .then(result => {
+        if (!result.skipped) {
+          console.log(`✅ Email dispatched successfully via Brevo HTTPS API!`);
+        }
+      })
+      .catch(err => {
+        console.error('❌ HTTPS Email Dispatch Error:', err.message);
+      });
 
   } catch (err) {
     console.error('❌ Send OTP Route Error:', err.message);
@@ -363,7 +378,7 @@ app.post('/api/auth/send-otp', (req, res) => {
 });
 
 // ==========================================
-// 9. ROUTE: VERIFY OTP & RESET PASSWORD
+// 8. ROUTE: VERIFY OTP & RESET PASSWORD
 // ==========================================
 app.post('/api/auth/verify-otp-reset', async (req, res) => {
   try {
@@ -409,7 +424,7 @@ app.post('/api/auth/verify-otp-reset', async (req, res) => {
 });
 
 // ==========================================
-// 10. START SERVER IMMEDIATELY
+// 9. START SERVER IMMEDIATELY
 // ==========================================
 const PORT = process.env.PORT || 5000;
 
