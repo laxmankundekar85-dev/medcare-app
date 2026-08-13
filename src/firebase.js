@@ -9,7 +9,7 @@ import {
   signOut 
 } from "firebase/auth";
 
-// Your Firebase configuration with dynamic Vite env variable fallbacks
+// Your exact Firebase Web App Configuration
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDinq5y1Wjmq_5LR9iveaHLyXTZEWk1WhE",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "medcare-37177.firebaseapp.com",
@@ -20,9 +20,15 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-NWQX0P2TNY"
 };
 
-// Initialize Firebase safely (prevents re-initialization crashes during HMR / deployments)
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+// Guarantee default app initialization synchronously
+let app;
+if (!getApps().length) {
+  app = initializeApp(firebaseConfig);
+} else {
+  app = getApp();
+}
 
+// Initialize Auth explicitly bound to 'app'
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
