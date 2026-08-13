@@ -101,7 +101,7 @@ export default function Login({ onLogin }) {
   };
 
   const handleSendOTP = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setError('');
     setSuccessMessage('');
 
@@ -118,20 +118,34 @@ export default function Login({ onLogin }) {
 
     setLoading(true);
 
+    // 10-second timeout controller to ensure mobile browsers never hang infinitely
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.toLowerCase().trim() })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ email: email.toLowerCase().trim() }),
+        signal: controller.signal
       });
 
-      const data = await response.json();
+      clearTimeout(timeoutId);
+
+      let data = {};
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        throw new Error('Invalid response from server.');
+      }
 
       if (response.ok && data.success) {
         setOtpSent(true);
         setSuccessMessage('A 6-digit verification code has been sent to your email.');
       } else {
-        // Filter out raw backend Firebase initialization error messages
         if (data.error && data.error.includes('Firebase error')) {
           setError('Backend setup error. Please contact administrator or check server environment variables.');
         } else {
@@ -140,14 +154,19 @@ export default function Login({ onLogin }) {
       }
     } catch (err) {
       console.error("Backend connection error:", err);
-      setError(`Unable to connect to backend server at ${API_BASE_URL}`);
+      if (err.name === 'AbortError') {
+        setError('Server response timed out. Please check your network or tap "Send Verification OTP" again.');
+      } else {
+        setError(`Unable to connect to backend server at ${API_BASE_URL}. Ensure the backend is running.`);
+      }
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   };
 
   const handleVerifyAndReset = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setError('');
     setSuccessMessage('');
 
@@ -163,14 +182,28 @@ export default function Login({ onLogin }) {
 
     setLoading(true);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/verify-otp-reset`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.toLowerCase().trim(), otp, newPassword })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ email: email.toLowerCase().trim(), otp, newPassword }),
+        signal: controller.signal
       });
 
-      const data = await response.json();
+      clearTimeout(timeoutId);
+
+      let data = {};
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        throw new Error('Invalid server response.');
+      }
 
       if (response.ok && data.success) {
         alert('Password reset successful! You can now log in with your new password.');
@@ -181,8 +214,13 @@ export default function Login({ onLogin }) {
         setError(data.error || 'Invalid OTP code or password reset failed.');
       }
     } catch (err) {
-      setError('Server connection error. Please try again later.');
+      if (err.name === 'AbortError') {
+        setError('Request timed out. Please try again.');
+      } else {
+        setError('Server connection error. Please try again later.');
+      }
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   };
