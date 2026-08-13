@@ -96,6 +96,15 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// Verify SMTP Connection on Startup
+transporter.verify((error) => {
+  if (error) {
+    console.error('❌ Nodemailer SMTP Verification Error:', error.message);
+  } else {
+    console.log('📧 Nodemailer SMTP Transporter is ready to send emails.');
+  }
+});
+
 // In-memory store for OTPs
 const otpStore = new Map();
 
@@ -336,9 +345,11 @@ app.post('/api/auth/send-otp', async (req, res) => {
     return res.status(400).json({ error: 'Email address is required.' });
   }
 
+  const targetEmail = email.toLowerCase().trim();
+
   // Step A: Check Firebase User
   try {
-    await getAuth().getUserByEmail(email);
+    await getAuth().getUserByEmail(targetEmail);
   } catch (firebaseErr) {
     console.error('🔥 Firebase Admin Error:', firebaseErr.message);
     if (firebaseErr.code === 'auth/user-not-found') {
@@ -349,28 +360,28 @@ app.post('/api/auth/send-otp', async (req, res) => {
 
   // Step B: Generate OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
-  otpStore.set(email, { otp, expiresAt });
+  const expiresAt = Date.now() + 10 * 60 * 1000; // Extended to 10 minutes for user convenience
+  otpStore.set(targetEmail, { otp, expiresAt });
 
   // Step C: Send Email
   try {
     await transporter.sendMail({
       from: `"Medcare Support" <${process.env.EMAIL_USER || 'laxmankundekar85@gmail.com'}>`,
-      to: email,
+      to: targetEmail,
       subject: 'Medcare - Password Reset Verification Code',
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
           <h2 style="color: #0d9488;">Medcare Password Reset</h2>
           <p>You requested to reset your password. Use the verification code below:</p>
-          <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; width: 200px; margin: 20px 0;">
-            <span style="font-size: 28px; font-weight: bold; letter-spacing: 5px; color: #0f766e;">${otp}</span>
+          <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; width: 220px; margin: 20px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #0f766e;">${otp}</span>
           </div>
-          <p>This code will expire in <strong>5 minutes</strong>.</p>
+          <p>This code will expire in <strong>10 minutes</strong>. Do not share this code with anyone.</p>
         </div>
       `
     });
 
-    console.log(`✅ OTP successfully sent to ${email}`);
+    console.log(`✅ OTP (${otp}) successfully sent to ${targetEmail}`);
     return res.json({ success: true, message: 'OTP sent successfully to your email.' });
 
   } catch (emailErr) {
@@ -389,28 +400,29 @@ app.post('/api/auth/verify-otp-reset', async (req, res) => {
     return res.status(400).json({ error: 'Email, OTP, and new password are required.' });
   }
 
-  const record = otpStore.get(email);
+  const targetEmail = email.toLowerCase().trim();
+  const record = otpStore.get(targetEmail);
 
   if (!record) {
     return res.status(400).json({ error: 'No OTP request found or OTP expired.' });
   }
 
   if (Date.now() > record.expiresAt) {
-    otpStore.delete(email);
+    otpStore.delete(targetEmail);
     return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
   }
 
-  if (record.otp !== otp) {
+  if (record.otp !== otp.trim()) {
     return res.status(400).json({ error: 'Invalid verification code.' });
   }
 
   try {
-    const user = await getAuth().getUserByEmail(email);
+    const user = await getAuth().getUserByEmail(targetEmail);
     await getAuth().updateUser(user.uid, { password: newPassword });
 
-    otpStore.delete(email);
+    otpStore.delete(targetEmail);
 
-    console.log(`🔒 Password updated successfully for ${email}`);
+    console.log(`🔒 Password updated successfully for ${targetEmail}`);
     res.json({ success: true, message: 'Password updated successfully! You can now log in.' });
 
   } catch (error) {
