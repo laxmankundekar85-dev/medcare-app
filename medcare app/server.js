@@ -1,5 +1,5 @@
 import dns from 'dns';
-// FORCE Node.js to resolve IPv4 addresses first (Fixes Render ENETUNREACH IPv6 bug)
+// Force IPv4 resolution across Node.js to prevent Render IPv6 socket errors
 dns.setDefaultResultOrder('ipv4first');
 
 import dotenv from 'dotenv';
@@ -9,6 +9,7 @@ import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { createRequire } from 'module';
@@ -92,16 +93,21 @@ if (serviceAccount) {
 }
 
 // ==========================================
-// 5. NODEMAILER TRANSPORTER (Forced IPv4)
+// 5. EMAIL TRANSPORTERS (RESEND HTTPS + NODEMAILER FALLBACK)
 // ==========================================
 const senderEmail = process.env.EMAIL_USER || 'laxmankundekar85@gmail.com';
 const senderPass = process.env.EMAIL_PASS;
 
+// Resend HTTP API Client (Primary - Bypasses Render SMTP Blocking)
+const resendApiKey = process.env.RESEND_API_KEY;
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
+
+// Nodemailer Transporter (Fallback)
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 587,
-  secure: false, // TLS
-  family: 4,     // Force IPv4 socket
+  secure: false,
+  family: 4,
   auth: {
     user: senderEmail,
     pass: senderPass
@@ -211,9 +217,8 @@ app.post('/api/chat', async (req, res) => {
       INSTRUCTIONS:
       1. Address the patient warmly by name (${patientName}).
       2. Respond directly, specifically, and intelligently to any health condition, medical query, emergency situation, or symptom requested.
-      3. For critical emergencies (like snake bite, chest pain, heavy bleeding), urge immediate emergency hospitalization and provide crucial immediate first-aid steps.
-      4. Format your response cleanly using bullet points or bold text.
-      5. Always include a brief disclaimer: "Note: I am an AI assistant. Please consult a qualified doctor for clinical diagnoses."
+      3. Format your response cleanly using bullet points or bold text.
+      4. Always include a brief disclaimer: "Note: I am an AI assistant. Please consult a qualified doctor for clinical diagnoses."
     `;
 
     const fullPrompt = `${systemPrompt}\n\nPatient Query: ${message}`;
@@ -252,35 +257,7 @@ app.post('/api/chat', async (req, res) => {
     }
 
     if (!replyText) {
-      const lowerMsg = message.toLowerCase();
-
-      if (lowerMsg.includes('snake') || lowerMsg.includes('bite') || lowerMsg.includes('venom') || lowerMsg.includes('serpent')) {
-        replyText = `🚨 **EMERGENCY FIRST AID FOR SNAKE BITE** 🚨\n\nHello ${patientName}! Please stay calm and take these steps **IMMEDIATELY**:\n\n1. 🚑 **CALL EMERGENCY SERVICES (108 / 911) NOW** or get to the nearest emergency medical room immediately.\n2. **Keep Calm & Still:** Movement causes venom to spread faster through the bloodstream.\n3. **Immobilize the Area:** Keep the bitten limb at or slightly below heart level.\n4. **Remove Tight Items:** Take off rings, watches, or tight clothing near the bite in case of swelling.\n5. ❌ **DO NOT:** Cut the wound, suck out venom, apply ice, or tie a tight tourniquet.\n\n*Note: Anti-venom at a hospital is the only effective treatment for venomous snake bites. Get to an ER right away!*`;
-      } else if (lowerMsg.includes('chest pain') || lowerMsg.includes('heart attack') || lowerMsg.includes('shortness of breath')) {
-        replyText = `🚨 **CRITICAL MEDICAL EMERGENCY** 🚨\n\nHello ${patientName}! Chest pain can be a sign of a cardiac event. Please seek emergency medical care immediately:\n\n1. 🚑 **Call 108 / emergency services right away.**\n2. Sit down and rest in a comfortable position.\n3. Do not attempt to drive yourself to the hospital.\n\n*Note: Seek urgent clinical care immediately.*`;
-      } else if (lowerMsg.includes('burn') || lowerMsg.includes('bleed') || lowerMsg.includes('cut') || lowerMsg.includes('wound')) {
-        replyText = `Hello ${patientName}! For cuts or burns first-aid:\n\n1. **Bleeding:** Apply firm, continuous pressure with a clean cloth.\n2. **Burns:** Run cool (not ice-cold) tap water over the burn for 10-15 minutes.\n3. **Cleanliness:** Wash mild wounds gently with clean water.\n\n⚠️ Seek doctor evaluation for deep wounds, heavy bleeding, or severe burns.`;
-      } else if (lowerMsg.includes('head') || lowerMsg.includes('headache') || lowerMsg.includes('head pain')) {
-        replyText = `Hello ${patientName}! I am sorry to hear that your head is paining. 🤕\n\n**Immediate Relief Steps:**\n1. Rest in a dark, quiet, well-ventilated room.\n2. Hydrate with water, as dehydration is a primary trigger.\n3. Apply a cold or warm compress across your forehead.\n\n💊 **Active Logged Meds:** ${activeMeds}\n\n*Note: Please consult a physician before taking any unprescribed pain relief.*`;
-      } else if (lowerMsg.includes('fever') || lowerMsg.includes('temperature') || lowerMsg.includes('chills')) {
-        replyText = `Hello ${patientName}! For fever management:\n\n1. Rest comfortably and drink fluids (water, ORS).\n2. Apply a damp cloth to your forehead or neck.\n3. Monitor your temperature periodically.\n\n*Note: Consult a doctor if fever stays high.*`;
-      } else if (lowerMsg.includes('stomach') || lowerMsg.includes('nausea') || lowerMsg.includes('vomit') || lowerMsg.includes('cramp')) {
-        replyText = `Hello ${patientName}! For stomach discomfort:\n\n1. Sip small amounts of clear fluids or ginger tea.\n2. Avoid spicy or greasy foods.\n3. Rest in an upright position.\n\n*Note: Consult a doctor if severe pain persists.*`;
-      } else if (lowerMsg.includes('not feeling well') || lowerMsg.includes('sick') || lowerMsg.includes('unwell') || lowerMsg.includes('pain') || lowerMsg.includes('dizzy')) {
-        replyText = `Hello ${patientName}! I am sorry to hear that you are not feeling well. 💙\n\nNext steps:\n1. Rest and sip water regularly.\n2. Verify your active medications: **${activeMeds}**.\n3. Track any new symptoms.\n\n*Note: Consult a doctor for clinical diagnosis.*`;
-      } else if (lowerMsg.includes('medication') || lowerMsg.includes('medicine') || lowerMsg.includes('taking') || lowerMsg.includes('dose') || lowerMsg.includes('pill')) {
-        replyText = `Hello ${patientName}! 👋\n\nYour active Medcare medications:\n💊 **${activeMeds}**\n\nPlease follow your doctor's dosage schedule!`;
-      } else if (lowerMsg.includes('blood pressure') || lowerMsg.includes('bp') || lowerMsg.includes('hypertension')) {
-        replyText = `Hello ${patientName}! Core tips for healthy blood pressure:\n1. Reduce sodium intake.\n2. Engage in 30 mins of daily moderate exercise.\n3. Manage stress and stay hydrated.`;
-      } else if (lowerMsg.includes('doctor') || lowerMsg.includes('visit') || lowerMsg.includes('prepare') || lowerMsg.includes('appointment')) {
-        replyText = `Hello ${patientName}! To prepare for your visit:\n1. Note down symptoms and questions.\n2. Share your medication list (${activeMeds}).\n3. Bring previous lab reports.`;
-      } else if (lowerMsg.includes('hydration') || lowerMsg.includes('water') || lowerMsg.includes('fluid') || lowerMsg.includes('drink')) {
-        replyText = `Hello ${patientName}! Aim for 2.5 to 3 Liters of water daily for optimal health. 💧`;
-      } else if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('hey')) {
-        replyText = `Hello ${patientName}! 👋 Welcome to Medcare Assistant. How can I assist you with your health today?`;
-      } else {
-        replyText = `Hello ${patientName}! I am your Medcare AI Assistant.\n\nI can help you with:\n- First-aid guidance for symptoms & injuries\n- Information on your active medications (${activeMeds})\n- Preparing for doctor visits\n\nHow can I help you regarding your health right now?`;
-      }
+      replyText = `Hello ${patientName}! I am your Medcare AI Assistant. How can I assist you with your health today?\n\n*Note: I am an AI assistant. Please consult a qualified doctor for clinical diagnoses.*`;
     }
 
     res.json({ success: true, reply: replyText });
@@ -329,7 +306,7 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
 });
 
 // ==========================================
-// 8. ROUTE: SEND OTP
+// 8. ROUTE: SEND OTP (RESEND HTTP API + TERMINAL LOG BACKUP)
 // ==========================================
 app.post('/api/auth/send-otp', async (req, res) => {
   try {
@@ -346,33 +323,86 @@ app.post('/api/auth/send-otp', async (req, res) => {
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
     otpStore.set(targetEmail, { otp, expiresAt });
 
-    console.log(`📩 Dispatching OTP (${otp}) to "${targetEmail}" via ${senderEmail}...`);
+    // 🔑 LOG OTP DIRECTLY TO RENDER LOGS FOR IMMEDIATE ACCESS
+    console.log(`==========================================`);
+    console.log(`🔑 [DEBUG OTP GENERATED]:`);
+    console.log(`   TARGET EMAIL: ${targetEmail}`);
+    console.log(`   VERIFICATION CODE: ${otp}`);
+    console.log(`==========================================`);
 
-    const info = await transporter.sendMail({
-      from: `"Medcare Support" <${senderEmail}>`,
-      to: targetEmail,
-      subject: 'Medcare - Password Reset Verification Code',
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-          <h2 style="color: #0d9488;">Medcare Password Reset</h2>
-          <p>You requested to reset your password. Use the verification code below:</p>
-          <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; width: 220px; margin: 20px 0;">
-            <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #0f766e;">${otp}</span>
-          </div>
-          <p>This code will expire in <strong>10 minutes</strong>. Do not share this code with anyone.</p>
-        </div>
-      `
-    });
+    let sentSuccessfully = false;
+    let lastError = '';
 
-    console.log(`✅ OTP Email dispatched successfully: ${info.messageId}`);
-    return res.status(200).json({ success: true, message: 'OTP sent successfully to your email.' });
+    // Attempt 1: Try Resend API (HTTPS Request - Bypasses Render Port Blocks)
+    if (resend) {
+      try {
+        const { data, error } = await resend.emails.send({
+          from: 'Medcare Support <onboarding@resend.dev>',
+          to: targetEmail,
+          subject: 'Medcare - Password Reset Verification Code',
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+              <h2 style="color: #0d9488;">Medcare Password Reset</h2>
+              <p>You requested to reset your password. Use the verification code below:</p>
+              <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; width: 220px; margin: 20px 0;">
+                <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #0f766e;">${otp}</span>
+              </div>
+              <p>This code will expire in <strong>10 minutes</strong>.</p>
+            </div>
+          `
+        });
+
+        if (!error && data?.id) {
+          console.log(`✅ Sent via Resend API: ${data.id}`);
+          sentSuccessfully = true;
+        } else if (error) {
+          console.warn('⚠️ Resend API Warning:', error.message);
+          lastError = error.message;
+        }
+      } catch (rErr) {
+        console.warn('⚠️ Resend Exception:', rErr.message);
+        lastError = rErr.message;
+      }
+    }
+
+    // Attempt 2: Fallback to Nodemailer if Resend was skipped or failed
+    if (!sentSuccessfully) {
+      try {
+        const info = await transporter.sendMail({
+          from: `"Medcare Support" <${senderEmail}>`,
+          to: targetEmail,
+          subject: 'Medcare - Password Reset Verification Code',
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+              <h2 style="color: #0d9488;">Medcare Password Reset</h2>
+              <p>You requested to reset your password. Use the verification code below:</p>
+              <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; width: 220px; margin: 20px 0;">
+                <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #0f766e;">${otp}</span>
+              </div>
+              <p>This code will expire in <strong>10 minutes</strong>.</p>
+            </div>
+          `
+        });
+        console.log(`✅ Sent via Nodemailer: ${info.messageId}`);
+        sentSuccessfully = true;
+      } catch (nErr) {
+        console.error('❌ Nodemailer Error:', nErr.message);
+        lastError = nErr.message;
+      }
+    }
+
+    if (sentSuccessfully) {
+      return res.status(200).json({ success: true, message: 'OTP sent successfully to your email.' });
+    } else {
+      return res.status(500).json({ 
+        success: false, 
+        error: `Email delivery failed (${lastError}). Check Render logs for verification code.` 
+      });
+    }
 
   } catch (err) {
     console.error('❌ Send OTP Route Error:', err.message);
-    return res.status(500).json({ 
-      success: false, 
-      error: `Email delivery failed: ${err.message}` 
-    });
+    return res.status(500).json({ success: false, error: err.message || 'Server error.' });
   }
 });
 
