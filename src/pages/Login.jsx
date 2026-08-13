@@ -127,9 +127,9 @@ export default function Login({ onLogin }) {
 
     setLoading(true);
 
-    // Extended 25-second timeout window to accommodate Render free tier cold starts
+    // 45-second timeout window to accommodate Render free tier cold starts
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000);
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
@@ -192,7 +192,7 @@ export default function Login({ onLogin }) {
     setLoading(true);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/verify-otp-reset`, {

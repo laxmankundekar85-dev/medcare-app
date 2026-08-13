@@ -9,7 +9,6 @@ import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { createRequire } from 'module';
 
-// Enables JSON file imports in ES Module environment
 const require = createRequire(import.meta.url);
 
 // ==========================================
@@ -37,7 +36,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
-// Express handle preflight OPTIONS requests across all routes
 app.options('*', cors());
 
 // ==========================================
@@ -66,7 +64,7 @@ if (process.env.FIREBASE_PRIVATE_KEY) {
   try {
     serviceAccount = require('./serviceAccountKey.json');
   } catch (err) {
-    console.warn('⚠️ serviceAccountKey.json not found locally. Relying on environment variables.');
+    console.warn('⚠️ serviceAccountKey.json not found locally.');
   }
 }
 
@@ -81,17 +79,15 @@ if (serviceAccount) {
   } catch (err) {
     console.error('❌ Firebase Admin SDK Initialization Error:', err.message);
   }
-} else {
-  console.warn('⚠️ Firebase Admin SDK skipped: No credentials found.');
 }
 
 // ==========================================
-// 4. NODEMAILER TRANSPORTER (Port 587 TLS)
+// 4. NODEMAILER TRANSPORTER (Non-blocking)
 // ==========================================
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 587,
-  secure: false, // Must be false for Port 587 (uses STARTTLS)
+  secure: false,
   auth: {
     user: process.env.EMAIL_USER || 'laxmankundekar85@gmail.com',
     pass: process.env.EMAIL_PASS
@@ -99,18 +95,9 @@ const transporter = nodemailer.createTransport({
   tls: {
     rejectUnauthorized: false
   },
-  connectionTimeout: 8000,
-  greetingTimeout: 8000,
-  socketTimeout: 10000
-});
-
-// Verify SMTP Connection on Startup
-transporter.verify((error) => {
-  if (error) {
-    console.error('❌ Nodemailer SMTP Verification Error:', error.message);
-  } else {
-    console.log('📧 Nodemailer SMTP Transporter is ready to send emails.');
-  }
+  connectionTimeout: 5000,
+  greetingTimeout: 5000,
+  socketTimeout: 8000
 });
 
 // In-memory store for OTPs
@@ -149,7 +136,6 @@ app.use('/api/previous-diseases', previousDiseaseRoutes);
 // 7. ROUTE: PERSONALIZED AI HEALTH CHATBOT
 // ==========================================
 app.post('/api/chat', async (req, res) => {
-  console.log('📩 Chat endpoint hit on port 5000!');
   try {
     const { userId, message, userContext } = req.body;
 
@@ -230,7 +216,6 @@ app.post('/api/chat', async (req, res) => {
 
           if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
             replyText = data.candidates[0].content.parts[0].text;
-            console.log(`✅ AI Response generated successfully via Gemini API!`);
             break;
           }
         } catch (err) {
@@ -240,7 +225,6 @@ app.post('/api/chat', async (req, res) => {
     }
 
     if (!replyText) {
-      console.log('💡 Processing query via Local Health Assistant Engine...');
       const lowerMsg = message.toLowerCase();
 
       if (lowerMsg.includes('snake') || lowerMsg.includes('bite') || lowerMsg.includes('venom') || lowerMsg.includes('serpent')) {
@@ -310,7 +294,6 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
       }
     );
 
-    console.log(`💊 Medication (${id}) status updated to: ${targetStatus}`);
     res.status(200).json({ success: true, status: targetStatus });
   } catch (error) {
     console.error("Error toggling medication status:", error);
@@ -321,8 +304,7 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
 // ==========================================
 // 8. ROUTE: SEND OTP (INSTANT NON-BLOCKING RESPONSE)
 // ==========================================
-app.post('/api/auth/send-otp', async (req, res) => {
-  console.log('📌 POST /api/auth/send-otp endpoint hit');
+app.post('/api/auth/send-otp', (req, res) => {
   try {
     const { email } = req.body;
 
@@ -331,7 +313,6 @@ app.post('/api/auth/send-otp', async (req, res) => {
     }
 
     const targetEmail = email.toLowerCase().trim();
-    console.log(`📩 Dispatching OTP for: "${targetEmail}"`);
 
     // Generate 6-Digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -341,7 +322,7 @@ app.post('/api/auth/send-otp', async (req, res) => {
     // Respond IMMEDIATELY to release mobile browser lock
     res.status(200).json({ success: true, message: 'OTP sent successfully to your email.' });
 
-    // Send email in background asynchronously
+    // Send email asynchronously in background
     transporter.sendMail({
       from: `"Medcare Support" <${process.env.EMAIL_USER || 'laxmankundekar85@gmail.com'}>`,
       to: targetEmail,
@@ -356,14 +337,12 @@ app.post('/api/auth/send-otp', async (req, res) => {
           <p>This code will expire in <strong>10 minutes</strong>. Do not share this code with anyone.</p>
         </div>
       `
-    }).then(mailInfo => {
-      console.log(`✅ Background OTP Email dispatched: ${mailInfo.messageId}`);
     }).catch(mailErr => {
       console.error('❌ Background Nodemailer Error:', mailErr.message);
     });
 
   } catch (err) {
-    console.error('❌ Send OTP Route Execution Error:', err.message);
+    console.error('❌ Send OTP Route Error:', err.message);
     if (!res.headersSent) {
       return res.status(500).json({ success: false, error: err.message || 'Email delivery failed.' });
     }
@@ -374,7 +353,6 @@ app.post('/api/auth/send-otp', async (req, res) => {
 // 9. ROUTE: VERIFY OTP & RESET PASSWORD
 // ==========================================
 app.post('/api/auth/verify-otp-reset', async (req, res) => {
-  console.log('📌 POST /api/auth/verify-otp-reset endpoint hit');
   try {
     const { email, otp, newPassword } = req.body;
 
@@ -402,7 +380,6 @@ app.post('/api/auth/verify-otp-reset', async (req, res) => {
       try {
         const user = await getAuth().getUserByEmail(targetEmail);
         await getAuth().updateUser(user.uid, { password: newPassword });
-        console.log(`🔒 Password updated in Firebase for ${targetEmail}`);
       } catch (fbErr) {
         console.warn('⚠️ Firebase password update skipped:', fbErr.message);
       }
@@ -410,7 +387,6 @@ app.post('/api/auth/verify-otp-reset', async (req, res) => {
 
     otpStore.delete(targetEmail);
 
-    console.log(`✅ Password reset successfully completed for ${targetEmail}`);
     return res.json({ success: true, message: 'Password updated successfully! You can now log in.' });
 
   } catch (err) {
@@ -420,7 +396,7 @@ app.post('/api/auth/verify-otp-reset', async (req, res) => {
 });
 
 // ==========================================
-// 10. START SERVER
+// 10. START SERVER IMMEDIATELY
 // ==========================================
 const PORT = process.env.PORT || 5000;
 
