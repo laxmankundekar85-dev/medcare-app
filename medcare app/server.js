@@ -37,7 +37,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
-// Express handle preflight OPTIONS requests across all routes
+// Handle preflight OPTIONS requests across all routes
 app.options('*', cors());
 
 // ==========================================
@@ -99,9 +99,9 @@ const transporter = nodemailer.createTransport({
   tls: {
     rejectUnauthorized: false
   },
-  connectionTimeout: 10000, // 10 seconds timeout limit
-  greetingTimeout: 10000,
-  socketTimeout: 15000
+  connectionTimeout: 8000, // 8 seconds limit to prevent hanging
+  greetingTimeout: 8000,
+  socketTimeout: 10000
 });
 
 // Verify SMTP Connection on Startup
@@ -155,14 +155,12 @@ app.post('/api/chat', async (req, res) => {
 
     const apiKey = process.env.GEMINI_API_KEY;
 
-    // Default context from payload
     let patientName = userContext?.userName || 'Laxman';
     let patientId = userContext?.patientId || 'N/A';
     let bloodGroup = userContext?.bloodGroup || 'N/A';
     let weight = userContext?.weight || 'N/A';
     let activeMeds = userContext?.activeMedications || 'None logged';
 
-    // Query MongoDB directly if DB is connected and userId is passed
     const db = mongoose.connection.db;
     if (db && userId && userId !== 'guest_user') {
       try {
@@ -204,7 +202,6 @@ app.post('/api/chat', async (req, res) => {
     const fullPrompt = `${systemPrompt}\n\nPatient Query: ${message}`;
     let replyText = '';
 
-    // Attempt Gemini REST API call
     if (apiKey) {
       const apiEndpoints = [
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
@@ -238,7 +235,6 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    // Comprehensive Local Health Engine
     if (!replyText) {
       console.log('💡 Processing query via Local Health Assistant Engine...');
       const lowerMsg = message.toLowerCase();
@@ -319,7 +315,7 @@ app.patch('/api/medications/:id/toggle', async (req, res) => {
 });
 
 // ==========================================
-// 8. ROUTE: SEND OTP (OPTIMIZED FOR MOBILE CLIENTS)
+// 8. ROUTE: SEND OTP (FAST DIRECT DELIVERY)
 // ==========================================
 app.post('/api/auth/send-otp', async (req, res) => {
   console.log('📌 POST /api/auth/send-otp endpoint hit');
@@ -327,35 +323,18 @@ app.post('/api/auth/send-otp', async (req, res) => {
     const { email } = req.body;
 
     if (!email) {
-      console.warn('⚠️ OTP Request missing email');
       return res.status(400).json({ success: false, error: 'Email address is required.' });
     }
 
     const targetEmail = email.toLowerCase().trim();
-    console.log(`📩 Processing OTP request for: "${targetEmail}"`);
-
-    // Safely check Firebase Admin if initialized
-    if (getApps().length > 0) {
-      try {
-        await getAuth().getUserByEmail(targetEmail);
-        console.log(`👤 Firebase user verified for ${targetEmail}`);
-      } catch (firebaseErr) {
-        if (firebaseErr.code === 'auth/user-not-found') {
-          console.warn(`❌ No user found in Firebase for: ${targetEmail}`);
-          return res.status(404).json({ success: false, error: 'No account registered with this email address.' });
-        }
-        console.warn('⚠️ Firebase Admin lookup warning:', firebaseErr.message);
-      }
-    }
+    console.log(`📩 Dispatching OTP for: "${targetEmail}"`);
 
     // Generate 6-Digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes expiration
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
     otpStore.set(targetEmail, { otp, expiresAt });
 
-    console.log(`⚙️ Generated OTP (${otp}). Sending email via Nodemailer...`);
-
-    // Dispatch email synchronously to keep Render instance active
+    // Send Email directly via Nodemailer
     const mailInfo = await transporter.sendMail({
       from: `"Medcare Support" <${process.env.EMAIL_USER || 'laxmankundekar85@gmail.com'}>`,
       to: targetEmail,
@@ -373,10 +352,10 @@ app.post('/api/auth/send-otp', async (req, res) => {
     });
 
     console.log(`✅ OTP (${otp}) successfully dispatched to ${targetEmail}. MessageID: ${mailInfo.messageId}`);
-    return res.json({ success: true, message: 'OTP sent successfully to your email.' });
+    return res.status(200).json({ success: true, message: 'OTP sent successfully to your email.' });
 
   } catch (err) {
-    console.error('❌ Send OTP Route Execution Error:', err);
+    console.error('❌ Send OTP Route Execution Error:', err.message);
     return res.status(500).json({ success: false, error: err.message || 'Email delivery failed.' });
   }
 });
