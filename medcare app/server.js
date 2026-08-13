@@ -252,18 +252,19 @@ app.post('/api/chat', async (req, res) => {
 
     if (apiKey) {
       const apiEndpoints = [
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`,
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent`
       ];
 
-      for (const url of apiEndpoints) {
+      for (const baseUrl of apiEndpoints) {
         try {
-          const response = await fetch(url, {
+          const response = await fetch(`${baseUrl}?key=${apiKey}`, {
             method: 'POST',
             headers: { 
               'Content-Type': 'application/json',
-              'x-goog-api-key': apiKey
+              'x-goog-api-key': apiKey,
+              'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
               contents: [{ parts: [{ text: fullPrompt }] }]
@@ -275,6 +276,8 @@ app.post('/api/chat', async (req, res) => {
           if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
             replyText = data.candidates[0].content.parts[0].text;
             break;
+          } else if (data?.error) {
+            console.warn(`Gemini Chat API Error (${baseUrl}):`, data.error.message);
           }
         } catch (err) {
           console.warn(`Gemini Fetch Error:`, err.message);
@@ -361,19 +364,20 @@ app.post('/api/scan-medicine', async (req, res) => {
          ⚠️ **Important Precautions:** [Safety guidelines and warnings]`;
 
     const apiEndpoints = [
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`
     ];
 
     let analysisText = '';
 
-    for (const url of apiEndpoints) {
+    for (const baseUrl of apiEndpoints) {
       try {
-        const response = await fetch(url, {
+        const response = await fetch(`${baseUrl}?key=${apiKey}`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey
+            'x-goog-api-key': apiKey,
+            'Authorization': `Bearer ${apiKey}`
           },
           body: JSON.stringify({
             contents: [
@@ -397,6 +401,8 @@ app.post('/api/scan-medicine', async (req, res) => {
         if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
           analysisText = data.candidates[0].content.parts[0].text;
           break;
+        } else if (data?.error) {
+          console.warn(`Gemini Vision API Error (${baseUrl}):`, data.error.message);
         }
       } catch (err) {
         console.warn('Gemini Vision API Fetch Error:', err.message);
@@ -444,19 +450,20 @@ Please analyze this string (e.g., brand name, URL, batch information) and provid
 ⚠️ **Key Safety Precautions:** [Important warnings or contraindications]`;
 
     const apiEndpoints = [
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`
     ];
 
     let replyText = '';
 
-    for (const url of apiEndpoints) {
+    for (const baseUrl of apiEndpoints) {
       try {
-        const response = await fetch(url, {
+        const response = await fetch(`${baseUrl}?key=${apiKey}`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey
+            'x-goog-api-key': apiKey,
+            'Authorization': `Bearer ${apiKey}`
           },
           body: JSON.stringify({
             contents: [{ parts: [{ text: systemPrompt }] }]
@@ -468,9 +475,11 @@ Please analyze this string (e.g., brand name, URL, batch information) and provid
         if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
           replyText = data.candidates[0].content.parts[0].text;
           break;
+        } else if (data?.error) {
+          console.warn(`Gemini QR Text API Error (${baseUrl}):`, data.error.message);
         }
       } catch (err) {
-        console.warn('Gemini API Error:', err.message);
+        console.warn('Gemini API Fetch Error:', err.message);
       }
     }
 
@@ -479,7 +488,7 @@ Please analyze this string (e.g., brand name, URL, batch information) and provid
     } else {
       return res.status(400).json({ 
         success: false, 
-        error: 'Unable to analyze QR code text with AI.' 
+        error: 'Unable to analyze QR code text with AI. Please check server logs.' 
       });
     }
 
