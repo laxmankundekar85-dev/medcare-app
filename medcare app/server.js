@@ -8,7 +8,6 @@ import https from 'https';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { createRequire } from 'module';
-import { GoogleGenAI } from '@google/genai';
 
 const require = createRequire(import.meta.url);
 
@@ -252,46 +251,31 @@ app.post('/api/chat', async (req, res) => {
     let replyText = '';
 
     if (apiKey) {
-      try {
-        const ai = new GoogleGenAI({ apiKey });
-        const aiResponse = await ai.models.generateContent({
-          model: 'gemini-2.0-flash',
-          contents: fullPrompt,
-        });
+      const endpoints = [
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+      ];
 
-        if (aiResponse && aiResponse.text) {
-          replyText = aiResponse.text;
-        }
-      } catch (sdkErr) {
-        console.warn('SDK Chat Call failed, trying HTTP fallback:', sdkErr.message);
-        const apiEndpoints = [
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
-        ];
+      for (const url of endpoints) {
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: fullPrompt }] }]
+            })
+          });
 
-        for (const url of apiEndpoints) {
-          try {
-            const response = await fetch(url, {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'x-goog-api-key': apiKey,
-                'Authorization': `Bearer ${apiKey}`
-              },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: fullPrompt }] }]
-              })
-            });
+          const data = await response.json();
 
-            const data = await response.json();
-
-            if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-              replyText = data.candidates[0].content.parts[0].text;
-              break;
-            }
-          } catch (err) {
-            console.warn(`Gemini Fetch Error:`, err.message);
+          if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            replyText = data.candidates[0].content.parts[0].text;
+            break;
           }
+        } catch (err) {
+          console.warn(`Gemini Chat Fetch Error:`, err.message);
         }
       }
     }
@@ -362,66 +346,35 @@ Read all visible text (such as ELECTRAL, ORAL REHYDRATION SALTS, PARACETAMOL, do
     let analysisText = '';
 
     if (apiKey) {
-      // 1. Try Google Gen AI SDK
-      try {
-        const ai = new GoogleGenAI({ apiKey });
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.0-flash',
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                { text: systemPrompt },
-                {
-                  inlineData: {
-                    mimeType: mimeType,
-                    data: base64Data
-                  }
-                }
-              ]
-            }
-          ]
-        });
+      const endpoints = [
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+      ];
 
-        if (response && response.text) {
-          analysisText = response.text;
-        }
-      } catch (sdkErr) {
-        console.warn('SDK Vision Execution failed, trying REST fallback:', sdkErr.message);
+      for (const url of endpoints) {
+        try {
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: systemPrompt },
+                  { inline_data: { mime_type: mimeType, data: base64Data } }
+                ]
+              }]
+            })
+          });
 
-        // 2. Try REST fallback
-        const endpoints = [
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
-        ];
-
-        for (const url of endpoints) {
-          try {
-            const resp = await fetch(url, {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'x-goog-api-key': apiKey,
-                'Authorization': `Bearer ${apiKey}`
-              },
-              body: JSON.stringify({
-                contents: [{
-                  parts: [
-                    { text: systemPrompt },
-                    { inline_data: { mime_type: mimeType, data: base64Data } }
-                  ]
-                }]
-              })
-            });
-
-            const data = await resp.json();
-            if (resp.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-              analysisText = data.candidates[0].content.parts[0].text;
-              break;
-            }
-          } catch (fetchErr) {
-            console.warn('REST Fetch Error:', fetchErr.message);
+          const data = await resp.json();
+          if (resp.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            analysisText = data.candidates[0].content.parts[0].text;
+            break;
           }
+        } catch (fetchErr) {
+          console.warn('Vision Fetch Error:', fetchErr.message);
         }
       }
     }
@@ -495,47 +448,31 @@ Provide a comprehensive, structured clinical breakdown:
 ⚖️ **Typical Dosage & Guidance:** [Standard administration guidance or general dosage instructions]
 ⚠️ **Key Safety Precautions:** [Important medical warnings, contraindications, or safety advice]`;
 
-      try {
-        const ai = new GoogleGenAI({ apiKey });
-        const aiResponse = await ai.models.generateContent({
-          model: 'gemini-2.0-flash',
-          contents: systemPrompt,
-        });
+      const apiEndpoints = [
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+      ];
 
-        if (aiResponse && aiResponse.text) {
-          replyText = aiResponse.text;
-        }
-      } catch (sdkErr) {
-        console.warn('SDK Execution failed, attempting HTTPS fallback:', sdkErr.message);
+      for (const url of apiEndpoints) {
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: systemPrompt }] }]
+            })
+          });
 
-        const apiEndpoints = [
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
-        ];
+          const data = await response.json();
 
-        for (const url of apiEndpoints) {
-          try {
-            const response = await fetch(url, {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'x-goog-api-key': apiKey,
-                'Authorization': `Bearer ${apiKey}`
-              },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: systemPrompt }] }]
-              })
-            });
-
-            const data = await response.json();
-
-            if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-              replyText = data.candidates[0].content.parts[0].text;
-              break;
-            }
-          } catch (err) {
-            console.warn('Gemini API Fetch Error:', err.message);
+          if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            replyText = data.candidates[0].content.parts[0].text;
+            break;
           }
+        } catch (err) {
+          console.warn('Gemini API Fetch Error:', err.message);
         }
       }
     }
