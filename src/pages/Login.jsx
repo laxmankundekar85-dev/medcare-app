@@ -7,7 +7,6 @@ import {
   signInWithEmailAndPassword, 
   signInWithPopup 
 } from '../firebase';
-import { onAuthStateChanged } from 'firebase/auth';
 import { API_BASE_URL } from '../config';
 
 export default function Login({ onLogin }) {
@@ -23,31 +22,14 @@ export default function Login({ onLogin }) {
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // 1. Global Auth State Listener to reliably catch login sessions
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        localStorage.setItem('user', JSON.stringify({
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || fullName || user.email?.split('@')[0]
-        }));
-        onLogin();
-      }
-    });
-
-    return () => unsubscribe();
-  }, [onLogin, fullName]);
-
-  // Ping backend on Forgot Password view to wake up Render free tier instances
+  // Automatically ping the backend when the Forgot Password view is toggled to wake up Render
   useEffect(() => {
     if (isForgotPassword) {
       fetch(`${API_BASE_URL}/api/ping`, { method: 'GET' }).catch(() => {
-        // Silent catch for keep-alive ping
+        // Silent catch for pre-flight keep-alive ping
       });
     }
   }, [isForgotPassword]);
@@ -145,6 +127,7 @@ export default function Login({ onLogin }) {
 
     setLoading(true);
 
+    // 45-second timeout window to accommodate Render free tier cold starts
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 45000);
 
@@ -251,32 +234,22 @@ export default function Login({ onLogin }) {
     }
   };
 
-  // Google Login Handler
   const handleGoogleLogin = async () => {
     setError('');
     setSuccessMessage('');
-    setGoogleLoading(true);
-
     try {
-      googleProvider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, googleProvider);
-      
-      if (result?.user) {
-        const user = result.user;
-        localStorage.setItem('user', JSON.stringify({
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || user.email?.split('@')[0]
-        }));
-        onLogin();
-      }
+      const user = result.user;
+
+      localStorage.setItem('user', JSON.stringify({
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName || user.email.split('@')[0]
+      }));
+
+      onLogin();
     } catch (err) {
-      console.error("Google login error:", err);
-      if (err.code !== 'auth/popup-closed-by-user') {
-        setError(err.message || 'Google sign-in failed.');
-      }
-    } finally {
-      setGoogleLoading(false);
+      setError(err.message || 'Google sign-in failed.');
     }
   };
 
@@ -489,12 +462,11 @@ export default function Login({ onLogin }) {
 
             <button 
               type="button"
-              disabled={googleLoading}
               onClick={handleGoogleLogin}
-              className="w-full bg-white border border-slate-200 hover:bg-slate-50 py-3 rounded-xl font-medium flex justify-center items-center gap-2 transition text-sm text-slate-700 cursor-pointer disabled:opacity-60"
+              className="w-full bg-white border border-slate-200 hover:bg-slate-50 py-3 rounded-xl font-medium flex justify-center items-center gap-2 transition text-sm text-slate-700 cursor-pointer"
             >
               <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
-              <span>{googleLoading ? 'Signing in...' : 'Continue with Google'}</span>
+              Continue with Google
             </button>
           </>
         )}

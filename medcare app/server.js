@@ -191,69 +191,6 @@ const loadRoutes = async () => {
 loadRoutes();
 
 // ==========================================
-// ROBUST GEMINI CALLER (DISCOVERY + FALLBACK)
-// ==========================================
-async function callGemini(contents, apiKey) {
-  let targetModels = [];
-
-  // Step A: Dynamically query list of valid models for this exact key
-  try {
-    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-    if (listRes.ok) {
-      const listData = await listRes.json();
-      if (listData?.models && Array.isArray(listData.models)) {
-        targetModels = listData.models
-          .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
-          .map(m => m.name.replace(/^models\//, ''))
-          .filter(name => !name.includes('embedding') && !name.includes('aqa'));
-      }
-    }
-  } catch (err) {
-    console.warn('Model list query failed, using static list:', err.message);
-  }
-
-  // Static fallback list if discovery did not return names
-  if (targetModels.length === 0) {
-    targetModels = [
-      'gemini-2.5-flash',
-      'gemini-2.5-pro',
-      'gemini-1.5-flash-latest',
-      'gemini-1.5-flash',
-      'gemini-1.5-pro-latest',
-      'gemini-1.5-pro'
-    ];
-  }
-
-  let lastError = '';
-
-  for (const model of targetModels) {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ contents })
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-        return { success: true, text: data.candidates[0].content.parts[0].text, modelUsed: model };
-      } else if (data?.error) {
-        lastError = data.error.message || JSON.stringify(data.error);
-      }
-    } catch (fetchErr) {
-      lastError = fetchErr.message;
-    }
-  }
-
-  return { success: false, error: lastError };
-}
-
-// ==========================================
 // 6. ROUTE: PERSONALIZED AI HEALTH CHATBOT
 // ==========================================
 app.post('/api/chat', async (req, res) => {
@@ -314,9 +251,32 @@ app.post('/api/chat', async (req, res) => {
     let replyText = '';
 
     if (apiKey) {
-      const result = await callGemini([{ parts: [{ text: fullPrompt }] }], apiKey);
-      if (result.success) {
-        replyText = result.text;
+      const endpoints = [
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+      ];
+
+      for (const url of endpoints) {
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: fullPrompt }] }]
+            })
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            replyText = data.candidates[0].content.parts[0].text;
+            break;
+          }
+        } catch (err) {
+          console.warn(`Gemini Chat Fetch Error:`, err.message);
+        }
       }
     }
 
@@ -373,39 +333,67 @@ app.post('/api/scan-medicine', async (req, res) => {
       return res.status(500).json({ success: false, error: 'GEMINI_API_KEY is missing in server environment variables.' });
     }
 
+    // Clean base64 data
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
     const mimeMatch = imageBase64.match(/^data:(image\/\w+);base64,/);
     const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
 
-    const systemPrompt = `You are an expert pharmaceutical AI assistant. Visually identify the medicine from the uploaded image (pill, capsule, bottle, box, or strip).
-Read all visible text carefully (brand names, active formulas, strengths, dosage guidelines) and provide a structured clinical breakdown:
+    const systemPrompt = `You are an expert pharmaceutical AI assistant. Visually identify the medicine from the uploaded image (pill, capsule, sachet, box, or strip).
+Read all visible text (brand names, active ingredients, dosage) and provide a completely accurate structured clinical breakdown:
 
 💊 **Identified Medicine:** [Name and Strength/Formula]
 🏥 **Used For Diseases / Symptoms:** [Bullet list of primary indications]
 ⚖️ **Typical Dosage & Instructions:** [Standard dosage guidance or application instructions]
 ⚠️ **Important Precautions:** [Safety guidelines, warnings, and contraindications]`;
 
-    const contents = [{
-      parts: [
-        { text: systemPrompt },
-        {
-          inline_data: {
-            mime_type: mimeType,
-            data: base64Data
-          }
+    let analysisText = '';
+    let apiErrorMessage = '';
+
+    const endpoints = [
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+    ];
+
+    for (const url of endpoints) {
+      try {
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: systemPrompt },
+                { inline_data: { mime_type: mimeType, data: base64Data } }
+              ]
+            }]
+          })
+        });
+
+        const data = await resp.json();
+
+        if (resp.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+          analysisText = data.candidates[0].content.parts[0].text;
+          break;
+        } else if (data?.error) {
+          apiErrorMessage = data.error.message || JSON.stringify(data.error);
+          console.error(`Gemini Vision API Error:`, apiErrorMessage);
         }
-      ]
-    }];
-
-    const result = await callGemini(contents, apiKey);
-
-    if (result.success) {
-      return res.json({ success: true, analysis: result.text });
+      } catch (fetchErr) {
+        apiErrorMessage = fetchErr.message;
+        console.warn('Vision Fetch Error:', fetchErr.message);
+      }
     }
 
+    if (analysisText) {
+      return res.json({ success: true, analysis: analysisText });
+    }
+
+    // Return the actual error reason to the frontend
     return res.status(400).json({
       success: false,
-      error: `AI analysis failed: ${result.error || 'Please ensure the photo is clear and API key is valid.'}`
+      error: `AI analysis failed: ${apiErrorMessage || 'Unable to identify image. Please ensure the label text is clear.'}`
     });
 
   } catch (error) {
@@ -427,6 +415,7 @@ app.post('/api/scan-qr-text', async (req, res) => {
 
     const cleanInput = String(textData).trim().toLowerCase();
 
+    // Fast Rule Pre-Parser for Common Brands / Keywords
     if (cleanInput.includes('electral')) {
       return res.json({
         success: true,
@@ -463,9 +452,32 @@ Provide a comprehensive, structured clinical breakdown:
 ⚖️ **Typical Dosage & Guidance:** [Standard administration guidance or general dosage instructions]
 ⚠️ **Key Safety Precautions:** [Important medical warnings, contraindications, or safety advice]`;
 
-      const result = await callGemini([{ parts: [{ text: systemPrompt }] }], apiKey);
-      if (result.success) {
-        replyText = result.text;
+      const apiEndpoints = [
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+      ];
+
+      for (const url of apiEndpoints) {
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: systemPrompt }] }]
+            })
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            replyText = data.candidates[0].content.parts[0].text;
+            break;
+          }
+        } catch (err) {
+          console.warn('Gemini API Fetch Error:', err.message);
+        }
       }
     }
 
@@ -532,8 +544,9 @@ app.post('/api/auth/send-otp', (req, res) => {
 
     const targetEmail = email.toLowerCase().trim();
 
+    // Generate 6-Digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 10 * 60 * 1000;
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
     otpStore.set(targetEmail, { otp, expiresAt });
 
     console.log(`==========================================`);
