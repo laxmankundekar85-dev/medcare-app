@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Activity, FileText, ChevronRight, Plus, Bot, Sparkles } from 'lucide-react';
+import { User, Activity, FileText, ChevronRight, Plus } from 'lucide-react';
 import { StatCard } from '../components/ui/Cards';
 import { API_BASE_URL } from '../config';
 import { getUserId, getCacheKey } from '../utils/user';
@@ -114,8 +114,6 @@ export default function Dashboard({ onNavigate }) {
       const res = await fetch(`${API_BASE_URL}/api/profile/${userId}`);
       if (res.ok) {
         const data = await res.json();
-        const currentUser = getStoredUserInfo();
-
         if (data.weight) {
           setWeight(Number(data.weight));
           localStorage.setItem(getCacheKey('userWeight'), String(data.weight));
@@ -123,26 +121,6 @@ export default function Dashboard({ onNavigate }) {
         if (data.height) {
           setHeight(Number(data.height));
           localStorage.setItem(getCacheKey('userHeight'), String(data.height));
-        }
-        
-        // Guard against backend returning default mock name "Laxman"
-        if (data.fullName && data.fullName !== 'Laxman') {
-          setPatientName(data.fullName);
-          setTempName(data.fullName);
-          localStorage.setItem(getCacheKey('patientName'), data.fullName);
-        } else {
-          setPatientName(currentUser.name);
-          setTempName(currentUser.name);
-        }
-
-        // Guard against backend returning default mock ID "#MC8829"
-        if (data.patientId && data.patientId !== '#MC8829') {
-          setPatientId(data.patientId);
-          setTempId(data.patientId);
-          localStorage.setItem(getCacheKey('patientId'), data.patientId);
-        } else {
-          setPatientId(currentUser.id);
-          setTempId(currentUser.id);
         }
       }
     } catch (error) {
@@ -199,9 +177,7 @@ export default function Dashboard({ onNavigate }) {
 
   const handleQuickAction = (action) => {
     setIsFabMenuOpen(false);
-    if (action === 'chatbot') {
-      if (onNavigate) onNavigate('chatbot');
-    } else if (action === 'vitals') {
+    if (action === 'vitals') {
       setIsVitalsModalOpen(true);
     } else if (action === 'appointment') {
       alert('Opening new appointment scheduler...');
@@ -363,22 +339,9 @@ export default function Dashboard({ onNavigate }) {
 
       {/* Floating Action Control */}
       <div className="fixed bottom-20 right-5 z-40" onClick={(e) => e.stopPropagation()}>
-        {/* Expanded Quick Action & AI Menu */}
+        {/* Expanded Quick Action Menu */}
         {isFabMenuOpen && (
           <div className="absolute bottom-16 right-0 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 w-56 space-y-1 mb-2 animate-in fade-in slide-in-from-bottom-2 duration-150">
-            {/* Featured AI Assistant Option */}
-            <button 
-              type="button" 
-              onClick={() => handleQuickAction('chatbot')}
-              className="w-full text-left px-3 py-2.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition flex items-center gap-2.5 cursor-pointer border border-emerald-100"
-            >
-              <Bot size={18} className="text-emerald-700" />
-              <span className="flex-1">Ask AI Assistant</span>
-              <Sparkles size={14} className="text-amber-500 fill-amber-400" />
-            </button>
-
-            <div className="border-t border-slate-100 my-1"></div>
-
             <button 
               type="button" 
               onClick={() => handleQuickAction('profile')}
@@ -415,7 +378,7 @@ export default function Dashboard({ onNavigate }) {
           type="button" 
           onClick={() => setIsFabMenuOpen(!isFabMenuOpen)}
           className="w-14 h-14 bg-teal-800 hover:bg-teal-900 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-white transition transform active:scale-95 cursor-pointer"
-          title="Quick Actions & AI"
+          title="Quick Actions"
         >
           <Plus size={26} className={`transition-transform duration-200 ${isFabMenuOpen ? 'rotate-45' : ''}`} />
         </button>

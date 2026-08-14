@@ -245,7 +245,7 @@ export default function MedcareApp() {
               </div>
               <div>
                 <h2 className="font-bold text-lg">{userDisplayName}</h2>
-                <p className="text-sm text-slate-500">Patient ID: {userPatientId}</p>
+                <p className="text-sm text-slate-500 font-mono">Patient ID: {userPatientId}</p>
               </div>
             </div>
 
@@ -293,18 +293,6 @@ export default function MedcareApp() {
         {currentView === 'profile' && <Profile onLogout={handleLogout} />}
         {currentView === 'settings' && <Settings onLogout={handleLogout} />}
       </main>
-
-      {/* Floating AI Assistant Action Button (Placed at bottom-38 right-6 directly ABOVE the action button) */}
-      {currentView !== 'chatbot' && (
-        <button
-          type="button"
-          onClick={() => navigateTo('chatbot')}
-          className="fixed bottom-38 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-teal-800 text-white shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer border-2 border-slate-50"
-          aria-label="Open AI Assistant"
-        >
-          <Bot size={28} />
-        </button>
-      )}
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 w-full bg-slate-50 border-t border-slate-200 flex justify-around p-3 z-10 pb-6">
