@@ -5,7 +5,9 @@ import {
   googleProvider, 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
-  signInWithPopup 
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult 
 } from '../firebase';
 import { API_BASE_URL } from '../config';
 
@@ -24,6 +26,26 @@ export default function Login({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Handle Google Redirect Result on page mount (for mobile login flows)
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && result.user) {
+          const user = result.user;
+          localStorage.setItem('user', JSON.stringify({
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName || user.email.split('@')[0]
+          }));
+          onLogin();
+        }
+      })
+      .catch((err) => {
+        console.error("Google redirect sign-in error:", err);
+        setError(err.message || 'Google sign-in failed during redirect.');
+      });
+  }, [onLogin]);
 
   // Automatically ping the backend when the Forgot Password view is toggled to wake up Render
   useEffect(() => {
@@ -127,7 +149,6 @@ export default function Login({ onLogin }) {
 
     setLoading(true);
 
-    // 45-second timeout window to accommodate Render free tier cold starts
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 45000);
 
@@ -237,18 +258,28 @@ export default function Login({ onLogin }) {
   const handleGoogleLogin = async () => {
     setError('');
     setSuccessMessage('');
+
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
+      if (isMobile) {
+        // Use redirect on mobile to avoid tab disconnects / closing IndexedDB issues
+        await signInWithRedirect(auth, googleProvider);
+      } else {
+        // Use popup for desktop browsers
+        const result = await signInWithPopup(auth, googleProvider);
+        const user = result.user;
 
-      localStorage.setItem('user', JSON.stringify({
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName || user.email.split('@')[0]
-      }));
+        localStorage.setItem('user', JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName || user.email.split('@')[0]
+        }));
 
-      onLogin();
+        onLogin();
+      }
     } catch (err) {
+      console.error("Google login error:", err);
       setError(err.message || 'Google sign-in failed.');
     }
   };
@@ -350,7 +381,7 @@ export default function Login({ onLogin }) {
                       className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600 text-sm" 
                     />
                     <button 
-                      type="button"
+                      type="button" 
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 cursor-pointer"
                     >
@@ -436,7 +467,7 @@ export default function Login({ onLogin }) {
                     className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-600 text-sm" 
                   />
                   <button 
-                    type="button"
+                    type="button" 
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 cursor-pointer"
                   >
@@ -478,7 +509,7 @@ export default function Login({ onLogin }) {
             <p>
               Already have an account?{' '}
               <button 
-                type="button"
+                type="button" 
                 onClick={() => { setIsRegistering(false); clearFormState(); }} 
                 className="text-teal-700 font-medium hover:underline cursor-pointer"
               >
@@ -489,7 +520,7 @@ export default function Login({ onLogin }) {
             <p>
               Don't have an account?{' '}
               <button 
-                type="button"
+                type="button" 
                 onClick={() => { setIsRegistering(true); clearFormState(); }} 
                 className="text-teal-700 font-medium hover:underline cursor-pointer"
               >
