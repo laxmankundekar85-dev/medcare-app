@@ -7,6 +7,7 @@ import {
   signInWithEmailAndPassword, 
   signInWithPopup 
 } from '../firebase';
+import { updateProfile } from 'firebase/auth';
 import { API_BASE_URL } from '../config';
 
 export default function Login({ onLogin }) {
@@ -22,10 +23,11 @@ export default function Login({ onLogin }) {
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Automatically ping the backend when the Forgot Password view is toggled to wake up Render
+  // Ping backend on Forgot Password view to wake up Render instances
   useEffect(() => {
     if (isForgotPassword) {
       fetch(`${API_BASE_URL}/api/ping`, { method: 'GET' }).catch(() => {
@@ -65,16 +67,28 @@ export default function Login({ onLogin }) {
       return;
     }
 
+    setLoading(true);
+
     try {
       if (isRegistering) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        localStorage.setItem('user', JSON.stringify({
+        // Attach display name to Firebase user object
+        try {
+          await updateProfile(user, { displayName: fullName.trim() });
+        } catch (profileErr) {
+          console.warn("Could not update Firebase profile display name:", profileErr);
+        }
+
+        // Store specific dynamic user data in localStorage
+        const userData = {
           uid: user.uid,
           email: user.email,
-          displayName: fullName
-        }));
+          displayName: fullName.trim(),
+          photoURL: user.photoURL || null
+        };
+        localStorage.setItem('user', JSON.stringify(userData));
 
         alert('Registration successful! Signing you in...');
         onLogin();
@@ -82,11 +96,16 @@ export default function Login({ onLogin }) {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        localStorage.setItem('user', JSON.stringify({
+        // Fallback display name from Firebase auth or email prefix
+        const resolvedName = user.displayName || email.split('@')[0];
+
+        const userData = {
           uid: user.uid,
           email: user.email,
-          displayName: user.displayName || email.split('@')[0]
-        }));
+          displayName: resolvedName,
+          photoURL: user.photoURL || null
+        };
+        localStorage.setItem('user', JSON.stringify(userData));
 
         onLogin();
       }
@@ -106,6 +125,8 @@ export default function Login({ onLogin }) {
         errorMessage = err.message;
       }
       setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -127,7 +148,6 @@ export default function Login({ onLogin }) {
 
     setLoading(true);
 
-    // 45-second timeout window to accommodate Render free tier cold starts
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 45000);
 
@@ -234,22 +254,37 @@ export default function Login({ onLogin }) {
     }
   };
 
+  // Dynamic Google Login Handler
   const handleGoogleLogin = async () => {
     setError('');
     setSuccessMessage('');
+    setGoogleLoading(true);
+
     try {
+      googleProvider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
+      
+      if (result?.user) {
+        const user = result.user;
+        const dynamicName = user.displayName || user.email?.split('@')[0] || 'User';
 
-      localStorage.setItem('user', JSON.stringify({
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName || user.email.split('@')[0]
-      }));
+        const userData = {
+          uid: user.uid,
+          email: user.email,
+          displayName: dynamicName,
+          photoURL: user.photoURL || null
+        };
 
-      onLogin();
+        localStorage.setItem('user', JSON.stringify(userData));
+        onLogin();
+      }
     } catch (err) {
-      setError(err.message || 'Google sign-in failed.');
+      console.error("Google sign-in error:", err);
+      if (err.code !== 'auth/popup-closed-by-user') {
+        setError(err.message || 'Google sign-in failed.');
+      }
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -447,9 +482,10 @@ export default function Login({ onLogin }) {
 
               <button 
                 type="submit" 
-                className="w-full bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl font-medium mt-2 flex justify-center items-center gap-2 transition shadow-sm cursor-pointer"
+                disabled={loading}
+                className="w-full bg-teal-800 hover:bg-teal-900 text-white py-3 rounded-xl font-medium mt-2 flex justify-center items-center gap-2 transition shadow-sm cursor-pointer disabled:opacity-60"
               >
-                <span>{isRegistering ? 'Register Account' : 'Sign In'}</span> 
+                <span>{loading ? 'Processing...' : (isRegistering ? 'Register Account' : 'Sign In')}</span> 
                 <LogOut size={18} className="rotate-180" />
               </button>
             </form>
@@ -462,11 +498,12 @@ export default function Login({ onLogin }) {
 
             <button 
               type="button"
+              disabled={googleLoading}
               onClick={handleGoogleLogin}
-              className="w-full bg-white border border-slate-200 hover:bg-slate-50 py-3 rounded-xl font-medium flex justify-center items-center gap-2 transition text-sm text-slate-700 cursor-pointer"
+              className="w-full bg-white border border-slate-200 hover:bg-slate-50 py-3 rounded-xl font-medium flex justify-center items-center gap-2 transition text-sm text-slate-700 cursor-pointer disabled:opacity-60"
             >
               <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
-              Continue with Google
+              <span>{googleLoading ? 'Signing in...' : 'Continue with Google'}</span>
             </button>
           </>
         )}

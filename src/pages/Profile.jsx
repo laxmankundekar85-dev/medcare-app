@@ -10,23 +10,49 @@ export default function Profile({ onLogout }) {
     return localStorage.getItem(getCacheKey('userAvatar')) || localStorage.getItem(`userAvatar_${userId}`);
   };
 
+  const getInitialUserData = () => {
+    try {
+      const u = JSON.parse(localStorage.getItem('user'));
+      if (u) {
+        const resolvedName = u.displayName || (u.email ? u.email.split('@')[0] : 'Patient');
+        const resolvedId = u.uid ? `#MC${u.uid.slice(-4).toUpperCase()}` : '#MC1001';
+        return {
+          name: resolvedName,
+          patientId: resolvedId,
+          email: u.email || '',
+          avatar: u.photoURL || null
+        };
+      }
+    } catch (e) {
+      console.warn('Error reading stored user for profile:', e);
+    }
+    return {
+      name: 'Patient',
+      patientId: '#MC1001',
+      email: '',
+      avatar: null
+    };
+  };
+
+  const initialUser = getInitialUserData();
+
   const [profile, setProfile] = useState(() => {
     try {
       const cached = JSON.parse(localStorage.getItem(getCacheKey('user_profile_cache')));
       if (cached) return cached;
     } catch {
-      // Fallback
+      // Fallback to dynamic session data
     }
     return {
-      name: 'Laxman',
-      patientId: '#MC8829',
+      name: initialUser.name,
+      patientId: initialUser.patientId,
       bloodGroup: 'B+',
       age: '20',
       weight: '60',
-      email: 'laxman.kundekar@healthmail.com',
+      email: initialUser.email,
       phone: '+91 9503883879',
       address: 'Mumbai, India',
-      avatar: getStoredAvatar() || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
+      avatar: getStoredAvatar() || initialUser.avatar || ''
     };
   });
 
@@ -107,8 +133,10 @@ export default function Profile({ onLogout }) {
             patientId: data.patientId || prev.patientId,
             bloodGroup: data.bloodGroup || prev.bloodGroup,
             weight: data.weight ? String(data.weight) : prev.weight,
+            age: data.age ? String(data.age) : prev.age,
             email: data.email || prev.email,
             phone: data.phone || prev.phone,
+            address: data.address || prev.address,
             avatar: freshAvatar
           };
 
@@ -133,7 +161,7 @@ export default function Profile({ onLogout }) {
 
   const openEditModal = (fieldKey, title) => {
     setEditField(fieldKey);
-    setEditVal(profile[fieldKey]);
+    setEditVal(profile[fieldKey] || '');
     setModalTitle(title);
     setIsEditModalOpen(true);
   };
@@ -151,9 +179,11 @@ export default function Profile({ onLogout }) {
       fullName: updatedProfile.name,
       patientId: updatedProfile.patientId,
       bloodGroup: updatedProfile.bloodGroup,
+      age: Number(updatedProfile.age) || updatedProfile.age,
       weight: Number(updatedProfile.weight) || 60,
       email: updatedProfile.email,
       phone: updatedProfile.phone,
+      address: updatedProfile.address,
       avatar: updatedProfile.avatar
     };
 
@@ -222,9 +252,11 @@ export default function Profile({ onLogout }) {
               fullName: profile.name,
               patientId: profile.patientId,
               bloodGroup: profile.bloodGroup,
+              age: Number(profile.age) || profile.age,
               weight: Number(profile.weight) || 60,
               email: profile.email,
               phone: profile.phone,
+              address: profile.address,
               avatar: compressedBase64
             })
           });
@@ -242,6 +274,8 @@ export default function Profile({ onLogout }) {
     reader.readAsDataURL(file);
     e.target.value = null;
   };
+
+  const userInitial = profile.name ? profile.name.charAt(0).toUpperCase() : 'U';
 
   return (
     <div className="p-6 max-w-4xl mx-auto pb-32 font-sans">
@@ -267,12 +301,16 @@ export default function Profile({ onLogout }) {
             onClick={() => fileInputRef.current && fileInputRef.current.click()}
             className="relative group cursor-pointer"
           >
-            <div className="w-24 h-24 rounded-full border-4 border-white shadow-md overflow-hidden bg-gray-200">
-              <img 
-                src={profile.avatar} 
-                alt="Profile Avatar" 
-                className="w-full h-full object-cover"
-              />
+            <div className="w-24 h-24 rounded-full border-4 border-white shadow-md overflow-hidden bg-teal-800 flex items-center justify-center text-white text-3xl font-bold">
+              {profile.avatar ? (
+                <img 
+                  src={profile.avatar} 
+                  alt="Profile Avatar" 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span>{userInitial}</span>
+              )}
             </div>
             
             <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-200 text-white text-[10px] font-semibold text-center px-1">
@@ -325,7 +363,7 @@ export default function Profile({ onLogout }) {
               <span className="text-teal-700 text-lg">✉️</span>
               <div>
                 <p className="text-xs text-gray-400">Email</p>
-                <p className="text-sm font-medium text-gray-800">{profile.email}</p>
+                <p className="text-sm font-medium text-gray-800">{profile.email || 'Not provided'}</p>
               </div>
             </div>
             <span className="text-xs text-teal-800 font-semibold">Edit</span>
@@ -424,7 +462,7 @@ export default function Profile({ onLogout }) {
         </div>
 
         <button 
-          type="button"
+          type="button" 
           onClick={onLogout}
           className="w-full bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 font-medium py-4 rounded-3xl transition flex items-center justify-center gap-2 text-sm shadow-sm cursor-pointer"
         >
@@ -439,7 +477,7 @@ export default function Profile({ onLogout }) {
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-gray-900">{modalTitle}</h3>
               <button 
-                type="button"
+                type="button" 
                 onClick={() => setIsEditModalOpen(false)}
                 className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer"
               >
@@ -501,7 +539,7 @@ export default function Profile({ onLogout }) {
                   <p className="text-xs text-gray-500">Require Fingerprint / Face ID to open app</p>
                 </div>
                 <button 
-                  type="button"
+                  type="button" 
                   onClick={() => savePrivacySettings({ ...privacySettings, biometric: !privacySettings.biometric })}
                   className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${privacySettings.biometric ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
                 >
@@ -515,7 +553,7 @@ export default function Profile({ onLogout }) {
                   <p className="text-xs text-gray-500">Require OTP code during new device logins</p>
                 </div>
                 <button 
-                  type="button"
+                  type="button" 
                   onClick={() => savePrivacySettings({ ...privacySettings, twoFactor: !privacySettings.twoFactor })}
                   className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${privacySettings.twoFactor ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
                 >
@@ -529,7 +567,7 @@ export default function Profile({ onLogout }) {
                   <p className="text-xs text-gray-500">Allow certified clinics to view test history</p>
                 </div>
                 <button 
-                  type="button"
+                  type="button" 
                   onClick={() => savePrivacySettings({ ...privacySettings, hipaaSharing: !privacySettings.hipaaSharing })}
                   className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${privacySettings.hipaaSharing ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
                 >
@@ -543,7 +581,7 @@ export default function Profile({ onLogout }) {
                   <p className="text-xs text-gray-500">Mask sensitive health stats in notifications</p>
                 </div>
                 <button 
-                  type="button"
+                  type="button" 
                   onClick={() => savePrivacySettings({ ...privacySettings, hideVitalsOnLock: !privacySettings.hideVitalsOnLock })}
                   className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${privacySettings.hideVitalsOnLock ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
                 >
@@ -567,7 +605,7 @@ export default function Profile({ onLogout }) {
 
               <div className="pt-2">
                 <button 
-                  type="button"
+                  type="button" 
                   onClick={() => alert('Password Reset email has been dispatched to your email.')}
                   className="w-full border border-teal-700 text-teal-800 hover:bg-teal-50 py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer"
                 >
@@ -609,7 +647,7 @@ export default function Profile({ onLogout }) {
                   <p className="text-xs text-gray-500">Push alarms at exact prescription times</p>
                 </div>
                 <button 
-                  type="button"
+                  type="button" 
                   onClick={() => saveNotifSettings({ ...notifSettings, medication: !notifSettings.medication })}
                   className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${notifSettings.medication ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
                 >
@@ -623,7 +661,7 @@ export default function Profile({ onLogout }) {
                   <p className="text-xs text-gray-500">Get notified 24h & 1h prior to visits</p>
                 </div>
                 <button 
-                  type="button"
+                  type="button" 
                   onClick={() => saveNotifSettings({ ...notifSettings, appointments: !notifSettings.appointments })}
                   className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${notifSettings.appointments ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
                 >
@@ -637,7 +675,7 @@ export default function Profile({ onLogout }) {
                   <p className="text-xs text-gray-500">Booster shot and injection reminders</p>
                 </div>
                 <button 
-                  type="button"
+                  type="button" 
                   onClick={() => saveNotifSettings({ ...notifSettings, vaccinations: !notifSettings.vaccinations })}
                   className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${notifSettings.vaccinations ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
                 >
@@ -651,7 +689,7 @@ export default function Profile({ onLogout }) {
                   <p className="text-xs text-gray-500">Critical vital threshold popups</p>
                 </div>
                 <button 
-                  type="button"
+                  type="button" 
                   onClick={() => saveNotifSettings({ ...notifSettings, emergencyAlerts: !notifSettings.emergencyAlerts })}
                   className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${notifSettings.emergencyAlerts ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
                 >
@@ -665,7 +703,7 @@ export default function Profile({ onLogout }) {
                   <p className="text-xs text-gray-500">Send weekly summary to registered email</p>
                 </div>
                 <button 
-                  type="button"
+                  type="button" 
                   onClick={() => saveNotifSettings({ ...notifSettings, emailSummaries: !notifSettings.emailSummaries })}
                   className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${notifSettings.emailSummaries ? 'bg-teal-800 justify-end' : 'bg-gray-300 justify-start'}`}
                 >

@@ -7,6 +7,23 @@ import { getUserId, getCacheKey } from '../utils/user';
 export default function Dashboard({ onNavigate }) {
   const userId = getUserId();
 
+  // Helper to read the current logged-in user dynamically from localStorage
+  const getStoredUserInfo = () => {
+    try {
+      const u = JSON.parse(localStorage.getItem('user'));
+      if (u) {
+        const resolvedName = u.displayName || (u.email ? u.email.split('@')[0] : 'Patient');
+        const resolvedId = u.uid ? `#MC${u.uid.slice(-4).toUpperCase()}` : '#MC1001';
+        return { name: resolvedName, id: resolvedId };
+      }
+    } catch (e) {
+      console.warn('Could not parse user from localStorage:', e);
+    }
+    return { name: 'Patient', id: '#MC1001' };
+  };
+
+  const initialUser = getStoredUserInfo();
+
   // Read immediately from LocalStorage for instant load & offline resilience (User Scoped)
   const [weight, setWeight] = useState(() => {
     return Number(localStorage.getItem(getCacheKey('userWeight'))) || 60;
@@ -16,15 +33,11 @@ export default function Dashboard({ onNavigate }) {
   });
 
   const [patientName, setPatientName] = useState(() => {
-    try {
-      const u = JSON.parse(localStorage.getItem('user'));
-      return localStorage.getItem(getCacheKey('patientName')) || u?.displayName || 'Patient';
-    } catch {
-      return 'Patient';
-    }
+    return localStorage.getItem(getCacheKey('patientName')) || initialUser.name;
   });
+  
   const [patientId, setPatientId] = useState(() => {
-    return localStorage.getItem(getCacheKey('patientId')) || '#MC8829';
+    return localStorage.getItem(getCacheKey('patientId')) || initialUser.id;
   });
 
   const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
@@ -69,8 +82,14 @@ export default function Dashboard({ onNavigate }) {
 
   const [loading, setLoading] = useState(true);
 
+  // Sync user info if active userId changes
   useEffect(() => {
     if (!userId || userId === 'guest_user') return;
+    
+    const currentUser = getStoredUserInfo();
+    setPatientName(localStorage.getItem(getCacheKey('patientName')) || currentUser.name);
+    setPatientId(localStorage.getItem(getCacheKey('patientId')) || currentUser.id);
+
     fetchDashboardData();
     fetchUserProfile();
   }, [userId]);
@@ -312,14 +331,14 @@ export default function Dashboard({ onNavigate }) {
         </button>
       </div>
 
-      {/* Floating Action Control (Positioned cleanly above bottom nav) */}
+      {/* Floating Action Control */}
       <div className="fixed bottom-20 right-5 z-40" onClick={(e) => e.stopPropagation()}>
         {/* Expanded Quick Action & AI Menu */}
         {isFabMenuOpen && (
           <div className="absolute bottom-16 right-0 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 w-56 space-y-1 mb-2 animate-in fade-in slide-in-from-bottom-2 duration-150">
             {/* Featured AI Assistant Option */}
             <button 
-              type="button"
+              type="button" 
               onClick={() => handleQuickAction('chatbot')}
               className="w-full text-left px-3 py-2.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition flex items-center gap-2.5 cursor-pointer border border-emerald-100"
             >
@@ -331,28 +350,28 @@ export default function Dashboard({ onNavigate }) {
             <div className="border-t border-slate-100 my-1"></div>
 
             <button 
-              type="button"
+              type="button" 
               onClick={() => handleQuickAction('profile')}
               className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-teal-50 hover:text-teal-800 rounded-xl transition flex items-center gap-2 cursor-pointer"
             >
               <span>👤 Edit Profile & ID</span>
             </button>
             <button 
-              type="button"
+              type="button" 
               onClick={() => handleQuickAction('vitals')}
               className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-teal-50 hover:text-teal-800 rounded-xl transition flex items-center gap-2 cursor-pointer"
             >
               <span>⚖️ Update Weight/BMI</span>
             </button>
             <button 
-              type="button"
+              type="button" 
               onClick={() => handleQuickAction('record')}
               className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-teal-50 hover:text-teal-800 rounded-xl transition flex items-center gap-2 cursor-pointer"
             >
               <span>📄 Add Medical Record</span>
             </button>
             <button 
-              type="button"
+              type="button" 
               onClick={() => handleQuickAction('appointment')}
               className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-teal-50 hover:text-teal-800 rounded-xl transition flex items-center gap-2 cursor-pointer"
             >
@@ -363,7 +382,7 @@ export default function Dashboard({ onNavigate }) {
 
         {/* Primary Floating Action Button */}
         <button 
-          type="button"
+          type="button" 
           onClick={() => setIsFabMenuOpen(!isFabMenuOpen)}
           className="w-14 h-14 bg-teal-800 hover:bg-teal-900 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-white transition transform active:scale-95 cursor-pointer"
           title="Quick Actions & AI"
@@ -379,7 +398,7 @@ export default function Dashboard({ onNavigate }) {
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-gray-900">Update Vitals</h3>
               <button 
-                type="button"
+                type="button" 
                 onClick={() => setIsVitalsModalOpen(false)}
                 className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer"
               >
@@ -430,7 +449,7 @@ export default function Dashboard({ onNavigate }) {
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-gray-900">Edit Profile</h3>
               <button 
-                type="button"
+                type="button" 
                 onClick={() => setIsProfileModalOpen(false)}
                 className="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer"
               >
@@ -494,7 +513,7 @@ export default function Dashboard({ onNavigate }) {
                 <p className="text-xs text-slate-400">Patient: {patientName} ({patientId})</p>
               </div>
               <button 
-                type="button"
+                type="button" 
                 onClick={() => setIsReportModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600 font-bold text-xl cursor-pointer"
               >

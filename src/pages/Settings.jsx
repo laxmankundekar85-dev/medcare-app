@@ -5,32 +5,72 @@ import { getUserId, getCacheKey } from '../utils/user';
 export default function Settings({ onLogout }) {
   const userId = getUserId();
 
+  // Helper to read initial user data from localStorage
+  const getInitialAccount = () => {
+    try {
+      const u = JSON.parse(localStorage.getItem('user'));
+      if (u) {
+        const resolvedName = u.displayName || (u.email ? u.email.split('@')[0] : 'Patient');
+        return {
+          name: resolvedName,
+          role: 'Patient',
+          photoURL: u.photoURL || null
+        };
+      }
+    } catch (e) {
+      console.warn('Error reading stored user in Settings:', e);
+    }
+    return {
+      name: 'Patient',
+      role: 'Patient',
+      photoURL: null
+    };
+  };
+
+  const initialAccount = getInitialAccount();
+
   // Read immediately from LocalStorage for instant load & offline resilience (User Scoped)
   const [account, setAccount] = useState(() => {
     try {
       const cached = JSON.parse(localStorage.getItem(getCacheKey('user_settings_account')));
       if (cached) return cached;
     } catch {
-      // Fallback if no JSON cache exists
+      // Fallback to dynamic session data
     }
-    return {
-      name: 'Patient Name',
-      role: 'Engineering Student & Patient'
-    };
+    return initialAccount;
   });
 
   const [activeModal, setActiveModal] = useState(null); // 'notifications', 'privacy', 'security', 'language', 'support', 'editAccount'
 
   // Modal Settings States
-  const [notifications, setNotifications] = useState({
-    push: true,
-    email: false,
-    reminders: true
+  const [notifications, setNotifications] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(getCacheKey('notif_settings'))) || {
+        push: true,
+        email: false,
+        reminders: true
+      };
+    } catch {
+      return {
+        push: true,
+        email: false,
+        reminders: true
+      };
+    }
   });
 
-  const [privacy, setPrivacy] = useState({
-    shareData: false,
-    profileVisible: true
+  const [privacy, setPrivacy] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(getCacheKey('privacy_settings'))) || {
+        shareData: false,
+        profileVisible: true
+      };
+    } catch {
+      return {
+        shareData: false,
+        profileVisible: true
+      };
+    }
   });
 
   const [security, setSecurity] = useState({
@@ -62,7 +102,8 @@ export default function Settings({ onLogout }) {
           setAccount(prev => {
             const updated = {
               ...prev,
-              name: data.fullName
+              name: data.fullName,
+              photoURL: data.avatar || prev.photoURL
             };
             localStorage.setItem(getCacheKey('user_settings_account'), JSON.stringify(updated));
             return updated;
@@ -81,7 +122,7 @@ export default function Settings({ onLogout }) {
   const handleSaveAccount = async (e) => {
     e.preventDefault();
 
-    const updatedAccount = { name: newName, role: newRole };
+    const updatedAccount = { ...account, name: newName, role: newRole };
     
     // Instant local save (User Scoped)
     setAccount(updatedAccount);
@@ -106,9 +147,12 @@ export default function Settings({ onLogout }) {
     setActiveModal(null);
   };
 
+  const userInitial = account.name ? account.name.charAt(0).toUpperCase() : 'U';
+  const userAvatar = localStorage.getItem(getCacheKey('userAvatar')) || account.photoURL;
+
   return (
     <div className="p-6 max-w-4xl mx-auto pb-32 font-sans text-gray-900">
-      {/* Clean Centered Header without back arrow or right avatar */}
+      {/* Header */}
       <div className="mb-6 text-center">
         <h1 className="text-xl font-bold">Settings</h1>
       </div>
@@ -116,8 +160,12 @@ export default function Settings({ onLogout }) {
       {/* User Info Card */}
       <div className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm mb-6 flex justify-between items-center text-gray-900">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-teal-50 text-teal-700 rounded-2xl flex items-center justify-center text-2xl font-bold shrink-0">
-            👤
+          <div className="w-14 h-14 bg-teal-800 text-white rounded-2xl flex items-center justify-center text-xl font-bold shrink-0 overflow-hidden shadow-sm">
+            {userAvatar ? (
+              <img src={userAvatar} alt={account.name} className="w-full h-full object-cover" />
+            ) : (
+              <span>{userInitial}</span>
+            )}
           </div>
           <div>
             <h2 className="font-bold text-lg">{account.name}</h2>
@@ -217,7 +265,7 @@ export default function Settings({ onLogout }) {
 
       {/* Sign Out Button */}
       <button 
-        type="button"
+        type="button" 
         onClick={onLogout}
         className="w-full bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 font-semibold py-4 rounded-3xl transition flex items-center justify-center gap-2 text-sm shadow-sm mb-8 cursor-pointer"
       >
