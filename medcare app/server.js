@@ -191,6 +191,76 @@ const loadRoutes = async () => {
 loadRoutes();
 
 // ==========================================
+// GEMINI DYNAMIC API CALL HELPER
+// ==========================================
+async function callGemini(contents, apiKey) {
+  let modelCandidates = [
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-pro-latest',
+    'gemini-2.0-flash-exp',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro'
+  ];
+
+  try {
+    const listResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+        'Authorization': `Bearer ${apiKey}`
+      }
+    });
+    if (listResp.ok) {
+      const listData = await listResp.json();
+      if (listData?.models && Array.isArray(listData.models)) {
+        const available = listData.models
+          .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
+          .map(m => m.name.replace(/^models\//, ''));
+        if (available.length > 0) {
+          modelCandidates = [...new Set([...available, ...modelCandidates])];
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Could not auto-list models, falling back to defaults:', err.message);
+  }
+
+  let lastError = '';
+
+  for (const model of modelCandidates) {
+    const urls = [
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`
+    ];
+
+    for (const url of urls) {
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({ contents })
+        });
+
+        const data = await response.json();
+        if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+          return { success: true, text: data.candidates[0].content.parts[0].text };
+        } else if (data?.error) {
+          lastError = data.error.message || JSON.stringify(data.error);
+        }
+      } catch (err) {
+        lastError = err.message;
+      }
+    }
+  }
+
+  return { success: false, error: lastError };
+}
+
+// ==========================================
 // 6. ROUTE: PERSONALIZED AI HEALTH CHATBOT
 // ==========================================
 app.post('/api/chat', async (req, res) => {
@@ -251,33 +321,9 @@ app.post('/api/chat', async (req, res) => {
     let replyText = '';
 
     if (apiKey) {
-      const endpoints = [
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`
-      ];
-
-      for (const url of endpoints) {
-        try {
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: fullPrompt }] }]
-            })
-          });
-
-          const data = await response.json();
-
-          if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-            replyText = data.candidates[0].content.parts[0].text;
-            break;
-          }
-        } catch (err) {
-          console.warn(`Gemini Chat Fetch Error:`, err.message);
-        }
+      const result = await callGemini([{ parts: [{ text: fullPrompt }] }], apiKey);
+      if (result.success) {
+        replyText = result.text;
       }
     }
 
@@ -347,60 +393,27 @@ Read all visible text carefully (brand names, active formulas, strengths, dosage
 ⚖️ **Typical Dosage & Instructions:** [Standard dosage guidance or application instructions]
 ⚠️ **Important Precautions:** [Safety guidelines, warnings, and contraindications]`;
 
-    let analysisText = '';
-    let apiErrorMessage = '';
-
-    const endpoints = [
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`
-    ];
-
-    for (const url of endpoints) {
-      try {
-        const resp = await fetch(url, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: systemPrompt },
-                {
-                  inline_data: {
-                    mime_type: mimeType,
-                    data: base64Data
-                  }
-                }
-              ]
-            }]
-          })
-        });
-
-        const data = await resp.json();
-
-        if (resp.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-          analysisText = data.candidates[0].content.parts[0].text;
-          break;
-        } else if (data?.error) {
-          apiErrorMessage = data.error.message || JSON.stringify(data.error);
-          console.warn(`Vision Endpoint (${url}) Error:`, apiErrorMessage);
+    const contents = [{
+      parts: [
+        { text: systemPrompt },
+        {
+          inline_data: {
+            mime_type: mimeType,
+            data: base64Data
+          }
         }
-      } catch (fetchErr) {
-        apiErrorMessage = fetchErr.message;
-        console.warn('Vision Fetch Error:', fetchErr.message);
-      }
+      ]
+    }];
+
+    const result = await callGemini(contents, apiKey);
+
+    if (result.success) {
+      return res.json({ success: true, analysis: result.text });
     }
 
-    if (analysisText) {
-      return res.json({ success: true, analysis: analysisText });
-    }
-
-    // Return the actual error reason to the frontend
     return res.status(400).json({
       success: false,
-      error: `AI analysis failed: ${apiErrorMessage || 'Unable to identify image. Please ensure the label text is clear.'}`
+      error: `AI analysis failed: ${result.error || 'Please ensure the photo is clear and API key is valid.'}`
     });
 
   } catch (error) {
@@ -459,33 +472,9 @@ Provide a comprehensive, structured clinical breakdown:
 ⚖️ **Typical Dosage & Guidance:** [Standard administration guidance or general dosage instructions]
 ⚠️ **Key Safety Precautions:** [Important medical warnings, contraindications, or safety advice]`;
 
-      const apiEndpoints = [
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`
-      ];
-
-      for (const url of apiEndpoints) {
-        try {
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: systemPrompt }] }]
-            })
-          });
-
-          const data = await response.json();
-
-          if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-            replyText = data.candidates[0].content.parts[0].text;
-            break;
-          }
-        } catch (err) {
-          console.warn('Gemini API Fetch Error:', err.message);
-        }
+      const result = await callGemini([{ parts: [{ text: systemPrompt }] }], apiKey);
+      if (result.success) {
+        replyText = result.text;
       }
     }
 
