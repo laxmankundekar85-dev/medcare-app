@@ -194,66 +194,34 @@ loadRoutes();
 // GEMINI DYNAMIC API CALL HELPER
 // ==========================================
 async function callGemini(contents, apiKey) {
-  let modelCandidates = [
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-pro-latest',
-    'gemini-2.0-flash-exp',
+  const models = [
     'gemini-1.5-flash',
-    'gemini-1.5-pro'
+    'gemini-1.5-pro',
+    'gemini-2.0-flash-exp'
   ];
-
-  try {
-    const listResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-        'Authorization': `Bearer ${apiKey}`
-      }
-    });
-    if (listResp.ok) {
-      const listData = await listResp.json();
-      if (listData?.models && Array.isArray(listData.models)) {
-        const available = listData.models
-          .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
-          .map(m => m.name.replace(/^models\//, ''));
-        if (available.length > 0) {
-          modelCandidates = [...new Set([...available, ...modelCandidates])];
-        }
-      }
-    }
-  } catch (err) {
-    console.warn('Could not auto-list models, falling back to defaults:', err.message);
-  }
 
   let lastError = '';
 
-  for (const model of modelCandidates) {
-    const urls = [
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`
-    ];
+  for (const model of models) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-    for (const url of urls) {
-      try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey,
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({ contents })
-        });
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ contents })
+      });
 
-        const data = await response.json();
-        if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-          return { success: true, text: data.candidates[0].content.parts[0].text };
-        } else if (data?.error) {
-          lastError = data.error.message || JSON.stringify(data.error);
-        }
-      } catch (err) {
-        lastError = err.message;
+      const data = await response.json();
+      if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        return { success: true, text: data.candidates[0].content.parts[0].text };
+      } else if (data?.error) {
+        lastError = data.error.message || JSON.stringify(data.error);
       }
+    } catch (err) {
+      lastError = err.message;
     }
   }
 
