@@ -5,10 +5,9 @@ import {
   googleProvider, 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
-  signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult 
+  signInWithPopup 
 } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { API_BASE_URL } from '../config';
 
 export default function Login({ onLogin }) {
@@ -24,34 +23,31 @@ export default function Login({ onLogin }) {
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Handle Google Redirect Result on page mount (for mobile login flows)
+  // 1. Global Auth State Listener to reliably catch login sessions
   useEffect(() => {
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result && result.user) {
-          const user = result.user;
-          localStorage.setItem('user', JSON.stringify({
-            uid: user.uid,
-            email: user.email,
-            displayName: user.displayName || user.email.split('@')[0]
-          }));
-          onLogin();
-        }
-      })
-      .catch((err) => {
-        console.error("Google redirect sign-in error:", err);
-        setError(err.message || 'Google sign-in failed during redirect.');
-      });
-  }, [onLogin]);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        localStorage.setItem('user', JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName || fullName || user.email?.split('@')[0]
+        }));
+        onLogin();
+      }
+    });
 
-  // Automatically ping the backend when the Forgot Password view is toggled to wake up Render
+    return () => unsubscribe();
+  }, [onLogin, fullName]);
+
+  // Ping backend on Forgot Password view to wake up Render free tier instances
   useEffect(() => {
     if (isForgotPassword) {
       fetch(`${API_BASE_URL}/api/ping`, { method: 'GET' }).catch(() => {
-        // Silent catch for pre-flight keep-alive ping
+        // Silent catch for keep-alive ping
       });
     }
   }, [isForgotPassword]);
@@ -255,32 +251,32 @@ export default function Login({ onLogin }) {
     }
   };
 
+  // Google Login Handler
   const handleGoogleLogin = async () => {
     setError('');
     setSuccessMessage('');
-
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    setGoogleLoading(true);
 
     try {
-      if (isMobile) {
-        // Use redirect on mobile to avoid tab disconnects / closing IndexedDB issues
-        await signInWithRedirect(auth, googleProvider);
-      } else {
-        // Use popup for desktop browsers
-        const result = await signInWithPopup(auth, googleProvider);
+      googleProvider.setCustomParameters({ prompt: 'select_account' });
+      const result = await signInWithPopup(auth, googleProvider);
+      
+      if (result?.user) {
         const user = result.user;
-
         localStorage.setItem('user', JSON.stringify({
           uid: user.uid,
           email: user.email,
-          displayName: user.displayName || user.email.split('@')[0]
+          displayName: user.displayName || user.email?.split('@')[0]
         }));
-
         onLogin();
       }
     } catch (err) {
       console.error("Google login error:", err);
-      setError(err.message || 'Google sign-in failed.');
+      if (err.code !== 'auth/popup-closed-by-user') {
+        setError(err.message || 'Google sign-in failed.');
+      }
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -493,11 +489,12 @@ export default function Login({ onLogin }) {
 
             <button 
               type="button"
+              disabled={googleLoading}
               onClick={handleGoogleLogin}
-              className="w-full bg-white border border-slate-200 hover:bg-slate-50 py-3 rounded-xl font-medium flex justify-center items-center gap-2 transition text-sm text-slate-700 cursor-pointer"
+              className="w-full bg-white border border-slate-200 hover:bg-slate-50 py-3 rounded-xl font-medium flex justify-center items-center gap-2 transition text-sm text-slate-700 cursor-pointer disabled:opacity-60"
             >
               <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
-              Continue with Google
+              <span>{googleLoading ? 'Signing in...' : 'Continue with Google'}</span>
             </button>
           </>
         )}
