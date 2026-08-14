@@ -252,8 +252,9 @@ app.post('/api/chat', async (req, res) => {
 
     if (apiKey) {
       const endpoints = [
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`
       ];
 
       for (const url of endpoints) {
@@ -338,8 +339,8 @@ app.post('/api/scan-medicine', async (req, res) => {
     const mimeMatch = imageBase64.match(/^data:(image\/\w+);base64,/);
     const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
 
-    const systemPrompt = `You are an expert pharmaceutical AI assistant. Visually identify the medicine from the uploaded image (pill, capsule, sachet, box, or strip).
-Read all visible text (brand names, active ingredients, dosage) and provide a completely accurate structured clinical breakdown:
+    const systemPrompt = `You are an expert pharmaceutical AI assistant. Visually identify the medicine from the uploaded image (pill, capsule, bottle, box, or strip).
+Read all visible text carefully (brand names, active formulas, strengths, dosage guidelines) and provide a structured clinical breakdown:
 
 💊 **Identified Medicine:** [Name and Strength/Formula]
 🏥 **Used For Diseases / Symptoms:** [Bullet list of primary indications]
@@ -350,8 +351,9 @@ Read all visible text (brand names, active ingredients, dosage) and provide a co
     let apiErrorMessage = '';
 
     const endpoints = [
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`
     ];
 
     for (const url of endpoints) {
@@ -365,7 +367,12 @@ Read all visible text (brand names, active ingredients, dosage) and provide a co
             contents: [{
               parts: [
                 { text: systemPrompt },
-                { inline_data: { mime_type: mimeType, data: base64Data } }
+                {
+                  inline_data: {
+                    mime_type: mimeType,
+                    data: base64Data
+                  }
+                }
               ]
             }]
           })
@@ -378,7 +385,7 @@ Read all visible text (brand names, active ingredients, dosage) and provide a co
           break;
         } else if (data?.error) {
           apiErrorMessage = data.error.message || JSON.stringify(data.error);
-          console.error(`Gemini Vision API Error:`, apiErrorMessage);
+          console.warn(`Vision Endpoint (${url}) Error:`, apiErrorMessage);
         }
       } catch (fetchErr) {
         apiErrorMessage = fetchErr.message;
@@ -453,8 +460,9 @@ Provide a comprehensive, structured clinical breakdown:
 ⚠️ **Key Safety Precautions:** [Important medical warnings, contraindications, or safety advice]`;
 
       const apiEndpoints = [
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`
       ];
 
       for (const url of apiEndpoints) {
