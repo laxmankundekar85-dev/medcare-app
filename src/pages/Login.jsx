@@ -36,6 +36,29 @@ export default function Login({ onLogin }) {
     }
   }, [isForgotPassword]);
 
+  // Helper to purge legacy/stale user cache from previous sessions
+  const clearPreviousSessionCache = () => {
+    const keysToPurge = [
+      'user',
+      'user_profile_cache',
+      'user_settings_account',
+      'patientName',
+      'patientId',
+      'userWeight',
+      'userHeight',
+      'userBloodGroup',
+      'userAge',
+      'userPhone',
+      'userAddress',
+      'userAvatar',
+      'cached_medications',
+      'cached_appointments',
+      'cached_alarms',
+      'cached_injections'
+    ];
+    keysToPurge.forEach((k) => localStorage.removeItem(k));
+  };
+
   const clearFormState = () => {
     setEmail('');
     setPassword('');
@@ -81,6 +104,9 @@ export default function Login({ onLogin }) {
           console.warn("Could not update Firebase profile display name:", profileErr);
         }
 
+        // Clean out previous user's cached values
+        clearPreviousSessionCache();
+
         // Store specific dynamic user data in localStorage
         const userData = {
           uid: user.uid,
@@ -95,6 +121,9 @@ export default function Login({ onLogin }) {
       } else {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
+
+        // Clean out previous user's cached values
+        clearPreviousSessionCache();
 
         // Fallback display name from Firebase auth or email prefix
         const resolvedName = user.displayName || email.split('@')[0];
@@ -266,7 +295,11 @@ export default function Login({ onLogin }) {
       
       if (result?.user) {
         const user = result.user;
-        const dynamicName = user.displayName || user.email?.split('@')[0] || 'User';
+
+        // Clean out previous user's cached values
+        clearPreviousSessionCache();
+
+        const dynamicName = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
 
         const userData = {
           uid: user.uid,

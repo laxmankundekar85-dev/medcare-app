@@ -87,8 +87,14 @@ export default function Dashboard({ onNavigate }) {
     if (!userId || userId === 'guest_user') return;
     
     const currentUser = getStoredUserInfo();
-    setPatientName(localStorage.getItem(getCacheKey('patientName')) || currentUser.name);
-    setPatientId(localStorage.getItem(getCacheKey('patientId')) || currentUser.id);
+    const storedScopedName = localStorage.getItem(getCacheKey('patientName'));
+    const activeName = storedScopedName || currentUser.name;
+    const activeId = localStorage.getItem(getCacheKey('patientId')) || currentUser.id;
+
+    setPatientName(activeName);
+    setPatientId(activeId);
+    setTempName(activeName);
+    setTempId(activeId);
 
     fetchDashboardData();
     fetchUserProfile();
@@ -167,6 +173,9 @@ export default function Dashboard({ onNavigate }) {
   const medProgress = totalMeds > 0 ? Math.round((takenMeds / totalMeds) * 100) : 0;
   const activeAlarmsCount = alarms.filter(a => a.isEnabled !== false && a.active !== false).length;
 
+  // Extract clean first name for the greeting
+  const firstName = (patientName || 'Patient').trim().split(' ')[0];
+
   const handleQuickAction = (action) => {
     setIsFabMenuOpen(false);
     if (action === 'chatbot') {
@@ -238,10 +247,10 @@ export default function Dashboard({ onNavigate }) {
       {/* Top Banner Card */}
       <div className="flex justify-between items-start bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <div>
-          <h2 className="text-3xl font-bold text-slate-900">Good morning, {patientName}.</h2>
+          <h2 className="text-3xl font-bold text-slate-900">Good morning, {firstName}.</h2>
           <p className="text-slate-500 mt-0.5">
             Your vitals look great today. 
-            <span className="text-xs text-teal-700 font-semibold bg-teal-50 px-2 py-0.5 rounded-md ml-1">{patientId}</span>
+            <span className="text-xs text-teal-700 font-semibold bg-teal-50 px-2 py-0.5 rounded-md ml-1 font-mono">{patientId}</span>
           </p>
         </div>
         

@@ -5,7 +5,7 @@ import { getUserId, getCacheKey } from '../utils/user';
 export default function Settings({ onLogout }) {
   const userId = getUserId();
 
-  // Helper to read initial user data from localStorage
+  // Helper to dynamically read the active logged-in user from localStorage
   const getInitialAccount = () => {
     try {
       const u = JSON.parse(localStorage.getItem('user'));
@@ -29,13 +29,15 @@ export default function Settings({ onLogout }) {
 
   const initialAccount = getInitialAccount();
 
-  // Read immediately from LocalStorage for instant load & offline resilience (User Scoped)
+  // Read from LocalStorage cache only if valid and not stuck on static values
   const [account, setAccount] = useState(() => {
     try {
       const cached = JSON.parse(localStorage.getItem(getCacheKey('user_settings_account')));
-      if (cached) return cached;
+      if (cached && cached.name && cached.name !== 'Laxman' && cached.name !== 'Patient Name') {
+        return cached;
+      }
     } catch {
-      // Fallback to dynamic session data
+      // Fallback to active dynamic session data
     }
     return initialAccount;
   });
@@ -86,10 +88,22 @@ export default function Settings({ onLogout }) {
   const [newRole, setNewRole] = useState(account.role);
 
   // ==========================================
-  // 1. FETCH PROFILE DATA FROM API
+  // 1. SYNC & FETCH PROFILE DATA FROM API
   // ==========================================
   useEffect(() => {
     if (!userId || userId === 'guest_user') return;
+
+    const current = getInitialAccount();
+    setAccount(prev => {
+      const updated = {
+        ...prev,
+        name: (prev.name === 'Laxman' || prev.name === 'Patient Name') ? current.name : (prev.name || current.name),
+        photoURL: current.photoURL || prev.photoURL
+      };
+      setNewName(updated.name);
+      return updated;
+    });
+
     fetchProfile();
   }, [userId]);
 
@@ -98,12 +112,14 @@ export default function Settings({ onLogout }) {
       const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`);
       if (response.ok) {
         const data = await response.json();
-        if (data.fullName) {
+        const current = getInitialAccount();
+
+        if (data.fullName && data.fullName !== 'Laxman') {
           setAccount(prev => {
             const updated = {
               ...prev,
-              name: data.fullName,
-              photoURL: data.avatar || prev.photoURL
+              name: data.fullName || current.name,
+              photoURL: data.avatar || current.photoURL || prev.photoURL
             };
             localStorage.setItem(getCacheKey('user_settings_account'), JSON.stringify(updated));
             return updated;
@@ -112,7 +128,7 @@ export default function Settings({ onLogout }) {
         }
       }
     } catch (error) {
-      console.warn('Error fetching settings profile, using local cache:', error);
+      console.warn('Error fetching settings profile, using local dynamic session:', error);
     }
   };
 
@@ -147,7 +163,7 @@ export default function Settings({ onLogout }) {
     setActiveModal(null);
   };
 
-  const userInitial = account.name ? account.name.charAt(0).toUpperCase() : 'U';
+  const userInitial = account.name ? account.name.trim().charAt(0).toUpperCase() : 'U';
   const userAvatar = localStorage.getItem(getCacheKey('userAvatar')) || account.photoURL;
 
   return (
@@ -160,7 +176,7 @@ export default function Settings({ onLogout }) {
       {/* User Info Card */}
       <div className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm mb-6 flex justify-between items-center text-gray-900">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-teal-800 text-white rounded-2xl flex items-center justify-center text-xl font-bold shrink-0 overflow-hidden shadow-sm">
+          <div className="w-14 h-14 bg-indigo-500 text-white rounded-2xl flex items-center justify-center text-2xl font-bold shrink-0 overflow-hidden shadow-sm">
             {userAvatar ? (
               <img src={userAvatar} alt={account.name} className="w-full h-full object-cover" />
             ) : (

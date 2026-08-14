@@ -10,6 +10,7 @@ export default function Profile({ onLogout }) {
     return localStorage.getItem(getCacheKey('userAvatar')) || localStorage.getItem(`userAvatar_${userId}`);
   };
 
+  // Dynamically resolve logged-in user credentials
   const getInitialUserData = () => {
     try {
       const u = JSON.parse(localStorage.getItem('user'));
@@ -39,18 +40,20 @@ export default function Profile({ onLogout }) {
   const [profile, setProfile] = useState(() => {
     try {
       const cached = JSON.parse(localStorage.getItem(getCacheKey('user_profile_cache')));
-      if (cached) return cached;
+      if (cached && cached.email === initialUser.email && cached.name !== 'Laxman') {
+        return cached;
+      }
     } catch {
-      // Fallback to dynamic session data
+      // Fallback
     }
     return {
       name: initialUser.name,
       patientId: initialUser.patientId,
-      bloodGroup: 'B+',
+      bloodGroup: 'O+',
       age: '20',
-      weight: '60',
+      weight: '64',
       email: initialUser.email,
-      phone: '+91 9503883879',
+      phone: '+91 98765 43210',
       address: 'Mumbai, India',
       avatar: getStoredAvatar() || initialUser.avatar || ''
     };
@@ -63,7 +66,7 @@ export default function Profile({ onLogout }) {
   const [editVal, setEditVal] = useState('');
   const [modalTitle, setModalTitle] = useState('');
 
-  // Comprehensive Notification Settings
+  // Notification Settings
   const [notifSettings, setNotifSettings] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(getCacheKey('notif_settings'))) || {
@@ -88,7 +91,7 @@ export default function Profile({ onLogout }) {
     }
   });
 
-  // Advanced Privacy & Security Settings
+  // Privacy & Security Settings
   const [privacySettings, setPrivacySettings] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(getCacheKey('privacy_settings'))) || {
@@ -111,6 +114,16 @@ export default function Profile({ onLogout }) {
 
   useEffect(() => {
     if (!userId || userId === 'guest_user') return;
+
+    const currentUser = getInitialUserData();
+    setProfile(prev => ({
+      ...prev,
+      name: prev.name === 'Laxman' ? currentUser.name : (prev.name || currentUser.name),
+      patientId: currentUser.patientId,
+      email: currentUser.email || prev.email,
+      avatar: getStoredAvatar() || currentUser.avatar || prev.avatar
+    }));
+
     fetchProfile();
   }, [userId]);
 
@@ -119,8 +132,10 @@ export default function Profile({ onLogout }) {
       const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`);
       if (response.ok) {
         const data = await response.json();
+        const currentUser = getInitialUserData();
+
         setProfile(prev => {
-          const freshAvatar = data.avatar || getStoredAvatar() || prev.avatar;
+          const freshAvatar = data.avatar || getStoredAvatar() || currentUser.avatar || prev.avatar;
           
           if (data.avatar) {
             localStorage.setItem(getCacheKey('userAvatar'), data.avatar);
@@ -129,12 +144,12 @@ export default function Profile({ onLogout }) {
 
           const updated = {
             ...prev,
-            name: data.fullName || prev.name,
-            patientId: data.patientId || prev.patientId,
+            name: data.fullName || currentUser.name || prev.name,
+            patientId: data.patientId || currentUser.patientId,
             bloodGroup: data.bloodGroup || prev.bloodGroup,
             weight: data.weight ? String(data.weight) : prev.weight,
             age: data.age ? String(data.age) : prev.age,
-            email: data.email || prev.email,
+            email: data.email || currentUser.email || prev.email,
             phone: data.phone || prev.phone,
             address: data.address || prev.address,
             avatar: freshAvatar
@@ -145,7 +160,7 @@ export default function Profile({ onLogout }) {
         });
       }
     } catch (error) {
-      console.warn('Error fetching profile data, retaining cached values:', error);
+      console.warn('Error fetching profile data, retaining dynamic session values:', error);
     }
   };
 
@@ -180,7 +195,7 @@ export default function Profile({ onLogout }) {
       patientId: updatedProfile.patientId,
       bloodGroup: updatedProfile.bloodGroup,
       age: Number(updatedProfile.age) || updatedProfile.age,
-      weight: Number(updatedProfile.weight) || 60,
+      weight: Number(updatedProfile.weight) || 64,
       email: updatedProfile.email,
       phone: updatedProfile.phone,
       address: updatedProfile.address,
@@ -253,7 +268,7 @@ export default function Profile({ onLogout }) {
               patientId: profile.patientId,
               bloodGroup: profile.bloodGroup,
               age: Number(profile.age) || profile.age,
-              weight: Number(profile.weight) || 60,
+              weight: Number(profile.weight) || 64,
               email: profile.email,
               phone: profile.phone,
               address: profile.address,
@@ -275,7 +290,7 @@ export default function Profile({ onLogout }) {
     e.target.value = null;
   };
 
-  const userInitial = profile.name ? profile.name.charAt(0).toUpperCase() : 'U';
+  const userInitial = profile.name ? profile.name.trim().charAt(0).toUpperCase() : 'U';
 
   return (
     <div className="p-6 max-w-4xl mx-auto pb-32 font-sans">
@@ -325,7 +340,7 @@ export default function Profile({ onLogout }) {
 
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900">{profile.name}</h2>
-        <p className="text-xs text-gray-400 mt-0.5">Patient ID: {profile.patientId}</p>
+        <p className="text-xs text-gray-400 mt-0.5 font-mono">Patient ID: {profile.patientId}</p>
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-8">
@@ -517,7 +532,7 @@ export default function Profile({ onLogout }) {
         </div>
       )}
 
-      {/* Advanced Privacy & Security Modal */}
+      {/* Privacy Modal */}
       {activeSubView === 'privacy' && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
@@ -625,7 +640,7 @@ export default function Profile({ onLogout }) {
         </div>
       )}
 
-      {/* Advanced Notification Settings Modal */}
+      {/* Notification Settings Modal */}
       {activeSubView === 'notifications' && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
@@ -723,7 +738,7 @@ export default function Profile({ onLogout }) {
         </div>
       )}
 
-      {/* Last Health Checkup Detail Modal */}
+      {/* Clinical Checkup Modal */}
       {activeSubView === 'checkup' && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
@@ -760,7 +775,7 @@ export default function Profile({ onLogout }) {
         </div>
       )}
 
-      {/* Vaccination Status Detail Modal */}
+      {/* Vaccination Status Modal */}
       {activeSubView === 'vaccination' && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
