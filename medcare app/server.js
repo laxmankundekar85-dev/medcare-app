@@ -322,13 +322,16 @@ app.post('/api/chat', async (req, res) => {
 // ==========================================
 app.post('/api/scan-medicine', async (req, res) => {
   try {
-    const { scanType, imageBase64 } = req.body;
+    const { imageBase64 } = req.body;
 
     if (!imageBase64) {
       return res.status(400).json({ success: false, error: 'Image data is required.' });
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ success: false, error: 'GEMINI_API_KEY is missing in server environment variables.' });
+    }
 
     // Clean base64 data
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
@@ -336,46 +339,50 @@ app.post('/api/scan-medicine', async (req, res) => {
     const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
 
     const systemPrompt = `You are an expert pharmaceutical AI assistant. Visually identify the medicine from the uploaded image (pill, capsule, sachet, box, or strip).
-Read all visible text (such as ELECTRAL, ORAL REHYDRATION SALTS, PARACETAMOL, dosage, active ingredients) and provide a structured clinical breakdown:
+Read all visible text (brand names, active ingredients, dosage) and provide a completely accurate structured clinical breakdown:
 
 💊 **Identified Medicine:** [Name and Strength/Formula]
 🏥 **Used For Diseases / Symptoms:** [Bullet list of primary indications]
-⚖️ **Typical Dosage & Instructions:** [Standard dosage guidance or preparation instructions]
+⚖️ **Typical Dosage & Instructions:** [Standard dosage guidance or application instructions]
 ⚠️ **Important Precautions:** [Safety guidelines, warnings, and contraindications]`;
 
     let analysisText = '';
+    let apiErrorMessage = '';
 
-    if (apiKey) {
-      const endpoints = [
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
-      ];
+    const endpoints = [
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+    ];
 
-      for (const url of endpoints) {
-        try {
-          const resp = await fetch(url, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: systemPrompt },
-                  { inline_data: { mime_type: mimeType, data: base64Data } }
-                ]
-              }]
-            })
-          });
+    for (const url of endpoints) {
+      try {
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: systemPrompt },
+                { inline_data: { mime_type: mimeType, data: base64Data } }
+              ]
+            }]
+          })
+        });
 
-          const data = await resp.json();
-          if (resp.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-            analysisText = data.candidates[0].content.parts[0].text;
-            break;
-          }
-        } catch (fetchErr) {
-          console.warn('Vision Fetch Error:', fetchErr.message);
+        const data = await resp.json();
+
+        if (resp.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+          analysisText = data.candidates[0].content.parts[0].text;
+          break;
+        } else if (data?.error) {
+          apiErrorMessage = data.error.message || JSON.stringify(data.error);
+          console.error(`Gemini Vision API Error:`, apiErrorMessage);
         }
+      } catch (fetchErr) {
+        apiErrorMessage = fetchErr.message;
+        console.warn('Vision Fetch Error:', fetchErr.message);
       }
     }
 
@@ -383,13 +390,10 @@ Read all visible text (such as ELECTRAL, ORAL REHYDRATION SALTS, PARACETAMOL, do
       return res.json({ success: true, analysis: analysisText });
     }
 
-    // Default Fallback
-    return res.json({
-      success: true,
-      analysis: `💊 **Identified Medicine:** Electral / ORS (Oral Rehydration Salts IP)\n\n` +
-                `🏥 **Used For Diseases / Symptoms:**\n• Dehydration caused by diarrhea, vomiting, or excessive heat/sweating\n• Rapid electrolyte replenishment\n\n` +
-                `⚖️ **Typical Dosage & Instructions:**\n• Dissolve the entire sachet contents in 1 Litre of clean drinking water.\n• Stir well and consume small sips throughout the day.\n\n` +
-                `⚠️ **Important Precautions:**\n• Use with care in patients with severe kidney disease or elevated blood potassium levels.\n• Do not boil the prepared solution.`
+    // Return the actual error reason to the frontend
+    return res.status(400).json({
+      success: false,
+      error: `AI analysis failed: ${apiErrorMessage || 'Unable to identify image. Please ensure the label text is clear.'}`
     });
 
   } catch (error) {
@@ -477,7 +481,6 @@ Provide a comprehensive, structured clinical breakdown:
       }
     }
 
-    // Structured Fallback
     if (!replyText) {
       replyText = `💊 **Scanned Code Target:**\n"${textData}"\n\n` +
                   `🏥 **Analysis:** Official pharmaceutical / patient engagement reference link detected. Please open the link in your browser or consult the product box for complete prescription details.`;
