@@ -336,7 +336,7 @@ app.post('/api/chat', async (req, res) => {
 });
 
 // ==========================================
-// 7. ROUTE: MEDICINE SCANNER (VISION & QR ANALYSIS)
+// 7. ROUTE: MEDICINE SCANNER (VISION & PHOTO ANALYSIS)
 // ==========================================
 app.post('/api/scan-medicine', async (req, res) => {
   try {
@@ -358,30 +358,23 @@ app.post('/api/scan-medicine', async (req, res) => {
     const mimeMatch = imageBase64.match(/^data:(image\/\w+);base64,/);
     const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
 
-    const systemPrompt = scanType === 'qr'
-      ? `You are an expert pharmaceutical AI assistant. Analyze this image containing a medicine QR code, barcode, or package text.
-         Identify the medicine and provide clear information in this structured format:
+    const systemPrompt = `You are an expert pharmaceutical AI assistant. Visually identify the medicine from the uploaded image (pill, capsule, sachet, box, or strip).
+Read any visible label text (such as ELECTRAL, ORAL REHYDRATION SALTS, PARACETAMOL, etc.) and provide a clear structured breakdown:
 
-         💊 **Medicine Name:** [Name and Strength]
-         🏥 **Used For Diseases / Symptoms:** [Bullet list of conditions]
-         ⚖️ **Recommended Dosage:** [Standard dosage details]
-         ⚠️ **Key Precautions:** [Important warnings and contraindications]`
-      : `You are an expert pharmaceutical AI assistant. Visually identify this medicine from the uploaded photo (pill, capsule, bottle, strip, or package).
-         Provide details in this structured format:
-
-         💊 **Identified Medicine:** [Name and Strength if visible]
-         🏥 **Used For Diseases / Symptoms:** [Bullet list of conditions]
-         ⚖️ **Typical Dosage:** [Standard dosage guidance]
-         ⚠️ **Important Precautions:** [Safety guidelines and warnings]`;
+💊 **Identified Medicine:** [Name and Strength/Formula]
+🏥 **Used For Diseases / Symptoms:** [Bullet list of primary indications]
+⚖️ **Typical Dosage & Instructions:** [Standard dosage guidance or preparation instructions]
+⚠️ **Important Precautions:** [Safety guidelines, warnings, and contraindications]`;
 
     let analysisText = '';
 
+    // Primary Execution: Google Gen AI SDK
     try {
       const ai = new GoogleGenAI({ apiKey });
       const aiResponse = await ai.models.generateContent({
         model: 'gemini-2.0-flash',
         contents: [
-          { text: systemPrompt },
+          systemPrompt,
           {
             inlineData: {
               mimeType: mimeType,
@@ -395,7 +388,7 @@ app.post('/api/scan-medicine', async (req, res) => {
         analysisText = aiResponse.text;
       }
     } catch (sdkErr) {
-      console.warn('SDK Vision Call failed, trying HTTP fallback:', sdkErr.message);
+      console.warn('SDK Vision Execution failed, trying HTTPS fallback:', sdkErr.message);
 
       const apiEndpoints = [
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
@@ -433,6 +426,8 @@ app.post('/api/scan-medicine', async (req, res) => {
           if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
             analysisText = data.candidates[0].content.parts[0].text;
             break;
+          } else if (data?.error) {
+            console.warn(`Vision HTTP Error (${baseUrl}):`, data.error.message);
           }
         } catch (err) {
           console.warn('Gemini Vision API Fetch Error:', err.message);
@@ -445,7 +440,7 @@ app.post('/api/scan-medicine', async (req, res) => {
     } else {
       return res.status(400).json({ 
         success: false, 
-        error: 'Could not clearly identify the medicine image. Please take a clearer photo with good lighting.' 
+        error: 'Could not clearly identify the medicine image. Please ensure the label text is visible and try again.' 
       });
     }
 
