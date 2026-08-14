@@ -191,22 +191,46 @@ const loadRoutes = async () => {
 loadRoutes();
 
 // ==========================================
-// GEMINI DYNAMIC API CALL HELPER
+// ROBUST GEMINI CALLER (DISCOVERY + FALLBACK)
 // ==========================================
 async function callGemini(contents, apiKey) {
-  const models = [
-    'gemini-1.5-flash',
-    'gemini-1.5-pro',
-    'gemini-2.0-flash-exp'
-  ];
+  let targetModels = [];
+
+  // Step A: Dynamically query list of valid models for this exact key
+  try {
+    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (listRes.ok) {
+      const listData = await listRes.json();
+      if (listData?.models && Array.isArray(listData.models)) {
+        targetModels = listData.models
+          .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+          .map(m => m.name.replace(/^models\//, ''))
+          .filter(name => !name.includes('embedding') && !name.includes('aqa'));
+      }
+    }
+  } catch (err) {
+    console.warn('Model list query failed, using static list:', err.message);
+  }
+
+  // Static fallback list if discovery did not return names
+  if (targetModels.length === 0) {
+    targetModels = [
+      'gemini-2.5-flash',
+      'gemini-2.5-pro',
+      'gemini-1.5-flash-latest',
+      'gemini-1.5-flash',
+      'gemini-1.5-pro-latest',
+      'gemini-1.5-pro'
+    ];
+  }
 
   let lastError = '';
 
-  for (const model of models) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  for (const model of targetModels) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     try {
-      const response = await fetch(url, {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -215,13 +239,14 @@ async function callGemini(contents, apiKey) {
       });
 
       const data = await response.json();
+
       if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-        return { success: true, text: data.candidates[0].content.parts[0].text };
+        return { success: true, text: data.candidates[0].content.parts[0].text, modelUsed: model };
       } else if (data?.error) {
         lastError = data.error.message || JSON.stringify(data.error);
       }
-    } catch (err) {
-      lastError = err.message;
+    } catch (fetchErr) {
+      lastError = fetchErr.message;
     }
   }
 
@@ -348,7 +373,6 @@ app.post('/api/scan-medicine', async (req, res) => {
       return res.status(500).json({ success: false, error: 'GEMINI_API_KEY is missing in server environment variables.' });
     }
 
-    // Clean base64 data
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
     const mimeMatch = imageBase64.match(/^data:(image\/\w+);base64,/);
     const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
@@ -403,7 +427,6 @@ app.post('/api/scan-qr-text', async (req, res) => {
 
     const cleanInput = String(textData).trim().toLowerCase();
 
-    // Fast Rule Pre-Parser for Common Brands / Keywords
     if (cleanInput.includes('electral')) {
       return res.json({
         success: true,
@@ -509,9 +532,8 @@ app.post('/api/auth/send-otp', (req, res) => {
 
     const targetEmail = email.toLowerCase().trim();
 
-    // Generate 6-Digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+    const expiresAt = Date.now() + 10 * 60 * 1000;
     otpStore.set(targetEmail, { otp, expiresAt });
 
     console.log(`==========================================`);
