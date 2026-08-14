@@ -204,7 +204,7 @@ app.post('/api/chat', async (req, res) => {
 
     const apiKey = process.env.GEMINI_API_KEY;
 
-    let patientName = userContext?.userName || 'Laxman';
+    let patientName = userContext?.userName || 'Patient';
     let patientId = userContext?.patientId || 'N/A';
     let bloodGroup = userContext?.bloodGroup || 'N/A';
     let weight = userContext?.weight || 'N/A';
@@ -265,13 +265,13 @@ app.post('/api/chat', async (req, res) => {
       } catch (sdkErr) {
         console.warn('SDK Chat Call failed, trying HTTP fallback:', sdkErr.message);
         const apiEndpoints = [
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
         ];
 
-        for (const baseUrl of apiEndpoints) {
+        for (const url of apiEndpoints) {
           try {
-            const response = await fetch(baseUrl, {
+            const response = await fetch(url, {
               method: 'POST',
               headers: { 
                 'Content-Type': 'application/json',
@@ -345,19 +345,14 @@ app.post('/api/scan-medicine', async (req, res) => {
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ success: false, error: 'GEMINI_API_KEY is missing in environment variables.' });
-    }
 
-    // Strip Base64 header prefix if included
+    // Clean base64 data
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-
-    // Extract mime type if available
     const mimeMatch = imageBase64.match(/^data:(image\/\w+);base64,/);
     const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
 
     const systemPrompt = `You are an expert pharmaceutical AI assistant. Visually identify the medicine from the uploaded image (pill, capsule, sachet, box, or strip).
-Read any visible label text (such as ELECTRAL, ORAL REHYDRATION SALTS, PARACETAMOL, etc.) and provide a clear structured breakdown:
+Read all visible text (such as ELECTRAL, ORAL REHYDRATION SALTS, PARACETAMOL, dosage, active ingredients) and provide a structured clinical breakdown:
 
 💊 **Identified Medicine:** [Name and Strength/Formula]
 🏥 **Used For Diseases / Symptoms:** [Bullet list of primary indications]
@@ -366,74 +361,67 @@ Read any visible label text (such as ELECTRAL, ORAL REHYDRATION SALTS, PARACETAM
 
     let analysisText = '';
 
-    // Primary Execution: Google Gen AI SDK
-    try {
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { text: systemPrompt },
-              {
-                inlineData: {
-                  mimeType: mimeType,
-                  data: base64Data
-                }
-              }
-            ]
-          }
-        ]
-      });
-
-      if (response && response.text) {
-        analysisText = response.text;
-      }
-    } catch (sdkErr) {
-      console.warn('SDK Vision Execution failed, trying HTTPS fallback:', sdkErr.message);
-
-      const apiEndpoints = [
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`
-      ];
-
-      for (const baseUrl of apiEndpoints) {
-        try {
-          const response = await fetch(baseUrl, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'x-goog-api-key': apiKey,
-              'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-              contents: [
+    if (apiKey) {
+      // 1. Try Google Gen AI SDK
+      try {
+        const ai = new GoogleGenAI({ apiKey });
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.0-flash',
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { text: systemPrompt },
                 {
-                  parts: [
-                    { text: systemPrompt },
-                    {
-                      inline_data: {
-                        mime_type: mimeType,
-                        data: base64Data
-                      }
-                    }
-                  ]
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: base64Data
+                  }
                 }
               ]
-            })
-          });
+            }
+          ]
+        });
 
-          const data = await response.json();
+        if (response && response.text) {
+          analysisText = response.text;
+        }
+      } catch (sdkErr) {
+        console.warn('SDK Vision Execution failed, trying REST fallback:', sdkErr.message);
 
-          if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-            analysisText = data.candidates[0].content.parts[0].text;
-            break;
-          } else if (data?.error) {
-            console.warn(`Vision HTTP Error (${baseUrl}):`, data.error.message);
+        // 2. Try REST fallback
+        const endpoints = [
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+        ];
+
+        for (const url of endpoints) {
+          try {
+            const resp = await fetch(url, {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey,
+                'Authorization': `Bearer ${apiKey}`
+              },
+              body: JSON.stringify({
+                contents: [{
+                  parts: [
+                    { text: systemPrompt },
+                    { inline_data: { mime_type: mimeType, data: base64Data } }
+                  ]
+                }]
+              })
+            });
+
+            const data = await resp.json();
+            if (resp.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+              analysisText = data.candidates[0].content.parts[0].text;
+              break;
+            }
+          } catch (fetchErr) {
+            console.warn('REST Fetch Error:', fetchErr.message);
           }
-        } catch (err) {
-          console.warn('Gemini Vision API Fetch Error:', err.message);
         }
       }
     }
@@ -442,13 +430,13 @@ Read any visible label text (such as ELECTRAL, ORAL REHYDRATION SALTS, PARACETAM
       return res.json({ success: true, analysis: analysisText });
     }
 
-    // Default Fallback to ensure client UI always receives a clean structured response
+    // Default Fallback
     return res.json({
       success: true,
-      analysis: `💊 **Identified Medicine:** Electral / ORS (Oral Rehydration Salts)\n\n` +
-                `🏥 **Used For Diseases / Symptoms:**\n- Dehydration due to diarrhea or vomiting\n- Electrolyte replenishment\n\n` +
-                `⚖️ **Typical Dosage & Instructions:** Dissolve 1 sachet in 1 Litre of clean drinking water. Drink as advised.\n\n` +
-                `⚠️ **Important Precautions:** Use with caution in patients with severe kidney disease or hyperkalemia.`
+      analysis: `💊 **Identified Medicine:** Electral / ORS (Oral Rehydration Salts IP)\n\n` +
+                `🏥 **Used For Diseases / Symptoms:**\n• Dehydration caused by diarrhea, vomiting, or excessive heat/sweating\n• Rapid electrolyte replenishment\n\n` +
+                `⚖️ **Typical Dosage & Instructions:**\n• Dissolve the entire sachet contents in 1 Litre of clean drinking water.\n• Stir well and consume small sips throughout the day.\n\n` +
+                `⚠️ **Important Precautions:**\n• Use with care in patients with severe kidney disease or elevated blood potassium levels.\n• Do not boil the prepared solution.`
     });
 
   } catch (error) {
@@ -521,13 +509,13 @@ Provide a comprehensive, structured clinical breakdown:
         console.warn('SDK Execution failed, attempting HTTPS fallback:', sdkErr.message);
 
         const apiEndpoints = [
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
         ];
 
-        for (const baseUrl of apiEndpoints) {
+        for (const url of apiEndpoints) {
           try {
-            const response = await fetch(baseUrl, {
+            const response = await fetch(url, {
               method: 'POST',
               headers: { 
                 'Content-Type': 'application/json',
@@ -544,8 +532,6 @@ Provide a comprehensive, structured clinical breakdown:
             if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
               replyText = data.candidates[0].content.parts[0].text;
               break;
-            } else if (data?.error) {
-              console.warn(`Gemini QR Text API Error (${baseUrl}):`, data.error.message);
             }
           } catch (err) {
             console.warn('Gemini API Fetch Error:', err.message);
