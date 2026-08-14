@@ -33,11 +33,19 @@ export default function Dashboard({ onNavigate }) {
   });
 
   const [patientName, setPatientName] = useState(() => {
-    return localStorage.getItem(getCacheKey('patientName')) || initialUser.name;
+    const cachedName = localStorage.getItem(getCacheKey('patientName'));
+    if (cachedName && cachedName !== 'Laxman' && cachedName !== 'Patient') {
+      return cachedName;
+    }
+    return initialUser.name;
   });
   
   const [patientId, setPatientId] = useState(() => {
-    return localStorage.getItem(getCacheKey('patientId')) || initialUser.id;
+    const cachedId = localStorage.getItem(getCacheKey('patientId'));
+    if (cachedId && cachedId !== '#MC8829') {
+      return cachedId;
+    }
+    return initialUser.id;
   });
 
   const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
@@ -88,8 +96,9 @@ export default function Dashboard({ onNavigate }) {
     
     const currentUser = getStoredUserInfo();
     const storedScopedName = localStorage.getItem(getCacheKey('patientName'));
-    const activeName = storedScopedName || currentUser.name;
-    const activeId = localStorage.getItem(getCacheKey('patientId')) || currentUser.id;
+    const activeName = (storedScopedName && storedScopedName !== 'Laxman') ? storedScopedName : currentUser.name;
+    const storedScopedId = localStorage.getItem(getCacheKey('patientId'));
+    const activeId = (storedScopedId && storedScopedId !== '#MC8829') ? storedScopedId : currentUser.id;
 
     setPatientName(activeName);
     setPatientId(activeId);
@@ -105,6 +114,8 @@ export default function Dashboard({ onNavigate }) {
       const res = await fetch(`${API_BASE_URL}/api/profile/${userId}`);
       if (res.ok) {
         const data = await res.json();
+        const currentUser = getStoredUserInfo();
+
         if (data.weight) {
           setWeight(Number(data.weight));
           localStorage.setItem(getCacheKey('userWeight'), String(data.weight));
@@ -113,15 +124,25 @@ export default function Dashboard({ onNavigate }) {
           setHeight(Number(data.height));
           localStorage.setItem(getCacheKey('userHeight'), String(data.height));
         }
-        if (data.fullName) {
+        
+        // Guard against backend returning default mock name "Laxman"
+        if (data.fullName && data.fullName !== 'Laxman') {
           setPatientName(data.fullName);
           setTempName(data.fullName);
           localStorage.setItem(getCacheKey('patientName'), data.fullName);
+        } else {
+          setPatientName(currentUser.name);
+          setTempName(currentUser.name);
         }
-        if (data.patientId) {
+
+        // Guard against backend returning default mock ID "#MC8829"
+        if (data.patientId && data.patientId !== '#MC8829') {
           setPatientId(data.patientId);
           setTempId(data.patientId);
           localStorage.setItem(getCacheKey('patientId'), data.patientId);
+        } else {
+          setPatientId(currentUser.id);
+          setTempId(currentUser.id);
         }
       }
     } catch (error) {

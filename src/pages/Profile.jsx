@@ -40,7 +40,7 @@ export default function Profile({ onLogout }) {
   const [profile, setProfile] = useState(() => {
     try {
       const cached = JSON.parse(localStorage.getItem(getCacheKey('user_profile_cache')));
-      if (cached && cached.email === initialUser.email && cached.name !== 'Laxman') {
+      if (cached && cached.name && cached.name !== 'Laxman' && cached.patientId !== '#MC8829') {
         return cached;
       }
     } catch {
@@ -118,8 +118,8 @@ export default function Profile({ onLogout }) {
     const currentUser = getInitialUserData();
     setProfile(prev => ({
       ...prev,
-      name: prev.name === 'Laxman' ? currentUser.name : (prev.name || currentUser.name),
-      patientId: currentUser.patientId,
+      name: (prev.name === 'Laxman' || !prev.name) ? currentUser.name : prev.name,
+      patientId: (prev.patientId === '#MC8829' || !prev.patientId) ? currentUser.patientId : prev.patientId,
       email: currentUser.email || prev.email,
       avatar: getStoredAvatar() || currentUser.avatar || prev.avatar
     }));
@@ -142,14 +142,23 @@ export default function Profile({ onLogout }) {
             localStorage.setItem(`userAvatar_${userId}`, data.avatar);
           }
 
+          // Guard against backend default mock values
+          const resolvedName = (data.fullName && data.fullName !== 'Laxman') 
+            ? data.fullName 
+            : currentUser.name;
+
+          const resolvedId = (data.patientId && data.patientId !== '#MC8829') 
+            ? data.patientId 
+            : currentUser.patientId;
+
           const updated = {
             ...prev,
-            name: data.fullName || currentUser.name || prev.name,
-            patientId: data.patientId || currentUser.patientId,
+            name: resolvedName,
+            patientId: resolvedId,
             bloodGroup: data.bloodGroup || prev.bloodGroup,
             weight: data.weight ? String(data.weight) : prev.weight,
             age: data.age ? String(data.age) : prev.age,
-            email: data.email || currentUser.email || prev.email,
+            email: currentUser.email || data.email || prev.email,
             phone: data.phone || prev.phone,
             address: data.address || prev.address,
             avatar: freshAvatar
