@@ -7,7 +7,7 @@ import {
   signInWithEmailAndPassword, 
   signInWithPopup 
 } from '../firebase';
-import { updateProfile } from 'firebase/auth';
+import { updateProfile, signInWithCredential, GoogleAuthProvider } from 'firebase/auth';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { Capacitor } from '@capacitor/core';
 import { API_BASE_URL } from '../config';
@@ -29,16 +29,12 @@ export default function Login({ onLogin }) {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Ping backend on Forgot Password view to wake up Render instances
   useEffect(() => {
     if (isForgotPassword) {
-      fetch(`${API_BASE_URL}/api/ping`, { method: 'GET' }).catch(() => {
-        // Silent catch for pre-flight keep-alive ping
-      });
+      fetch(`${API_BASE_URL}/api/ping`, { method: 'GET' }).catch(() => {});
     }
   }, [isForgotPassword]);
 
-  // Helper to purge legacy/stale user cache from previous sessions
   const clearPreviousSessionCache = () => {
     const keysToPurge = [
       'user',
@@ -99,17 +95,14 @@ export default function Login({ onLogin }) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        // Attach display name to Firebase user object
         try {
           await updateProfile(user, { displayName: fullName.trim() });
         } catch (profileErr) {
           console.warn("Could not update Firebase profile display name:", profileErr);
         }
 
-        // Clean out previous user's cached values
         clearPreviousSessionCache();
 
-        // Store specific dynamic user data in localStorage
         const userData = {
           uid: user.uid,
           email: user.email,
@@ -124,10 +117,8 @@ export default function Login({ onLogin }) {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        // Clean out previous user's cached values
         clearPreviousSessionCache();
 
-        // Fallback display name from Firebase auth or email prefix
         const resolvedName = user.displayName || email.split('@')[0];
 
         const userData = {
@@ -285,7 +276,7 @@ export default function Login({ onLogin }) {
     }
   };
 
-  // Cross-Platform Google Login Handler (Native Mobile Plugin + Web Popup Fallback)
+  // Cross-Platform Google Login Handler (Properly bridging native Capacitor Auth tokens into Firebase Web SDK)
   const handleGoogleLogin = async () => {
     setError('');
     setSuccessMessage('');
@@ -296,7 +287,9 @@ export default function Login({ onLogin }) {
 
       if (Capacitor.isNativePlatform()) {
         const result = await FirebaseAuthentication.signInWithGoogle();
-        user = result.user;
+        const credential = GoogleAuthProvider.credential(result.credential?.idToken);
+        const userCredential = await signInWithCredential(auth, credential);
+        user = userCredential.user;
       } else {
         if (!auth || !googleProvider) {
           throw new Error('Firebase Auth or Google Provider is not initialized properly.');
@@ -307,7 +300,6 @@ export default function Login({ onLogin }) {
       }
       
       if (user) {
-        // Clean out previous user's cached values
         clearPreviousSessionCache();
 
         const dynamicName = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
