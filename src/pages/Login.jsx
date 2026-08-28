@@ -8,6 +8,8 @@ import {
   signInWithPopup 
 } from '../firebase';
 import { updateProfile } from 'firebase/auth';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
+import { Capacitor } from '@capacitor/core';
 import { API_BASE_URL } from '../config';
 
 export default function Login({ onLogin }) {
@@ -283,22 +285,28 @@ export default function Login({ onLogin }) {
     }
   };
 
-  // Fixed Google Login Handler without any misaligned arguments
+  // Cross-Platform Google Login Handler (Native Mobile Plugin + Web Popup Fallback)
   const handleGoogleLogin = async () => {
     setError('');
     setSuccessMessage('');
     setGoogleLoading(true);
 
     try {
-      if (!auth || !googleProvider) {
-        throw new Error('Firebase Auth or Google Provider is not initialized properly.');
+      let user;
+
+      if (Capacitor.isNativePlatform()) {
+        const result = await FirebaseAuthentication.signInWithGoogle();
+        user = result.user;
+      } else {
+        if (!auth || !googleProvider) {
+          throw new Error('Firebase Auth or Google Provider is not initialized properly.');
+        }
+        googleProvider.setCustomParameters({ prompt: 'select_account' });
+        const result = await signInWithPopup(auth, googleProvider);
+        user = result.user;
       }
-
-      const result = await signInWithPopup(auth, googleProvider);
       
-      if (result?.user) {
-        const user = result.user;
-
+      if (user) {
         // Clean out previous user's cached values
         clearPreviousSessionCache();
 
