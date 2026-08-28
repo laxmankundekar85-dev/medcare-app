@@ -283,14 +283,17 @@ export default function Login({ onLogin }) {
     }
   };
 
-  // Dynamic Google Login Handler
+  // Fixed Google Login Handler without any misaligned arguments
   const handleGoogleLogin = async () => {
     setError('');
     setSuccessMessage('');
     setGoogleLoading(true);
 
     try {
-      googleProvider.setCustomParameters({ prompt: 'select_account' });
+      if (!auth || !googleProvider) {
+        throw new Error('Firebase Auth or Google Provider is not initialized properly.');
+      }
+
       const result = await signInWithPopup(auth, googleProvider);
       
       if (result?.user) {
@@ -313,7 +316,7 @@ export default function Login({ onLogin }) {
       }
     } catch (err) {
       console.error("Google sign-in error:", err);
-      if (err.code !== 'auth/popup-closed-by-user') {
+      if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
         setError(err.message || 'Google sign-in failed.');
       }
     } finally {

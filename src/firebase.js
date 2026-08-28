@@ -1,9 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { 
-  initializeAuth,
   getAuth,
-  browserLocalPersistence,
-  indexedDBLocalPersistence,
   GoogleAuthProvider, 
   signInWithPopup, 
   createUserWithEmailAndPassword, 
@@ -11,7 +8,6 @@ import {
   signOut 
 } from "firebase/auth";
 
-// Your exact Firebase Web App Configuration
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDinq5y1Wjmq_5LR9iveaHLyXTZEWk1WhE",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "medcare-37177.firebaseapp.com",
@@ -22,24 +18,12 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-NWQX0P2TNY"
 };
 
-// Guarantee default app initialization synchronously
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+const auth = getAuth(app);
 
-// Initialize Auth with explicit localStorage persistence and popup resolver removed for mobile web-view stability
-let authInstance;
-try {
-  authInstance = initializeAuth(app, {
-    persistence: [browserLocalPersistence, indexedDBLocalPersistence],
-  });
-} catch (e) {
-  // If already initialized (e.g., during Vite HMR reloads), reuse existing instance
-  authInstance = getAuth(app);
-}
-
-export const auth = authInstance;
+export { auth };
 export const googleProvider = new GoogleAuthProvider();
 
-// Export Auth functions (removed redirect methods to enforce secure popup handling)
 export { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
