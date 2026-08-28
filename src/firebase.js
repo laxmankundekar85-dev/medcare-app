@@ -3,12 +3,9 @@ import {
   initializeAuth,
   getAuth,
   browserLocalPersistence,
-  browserPopupRedirectResolver,
   indexedDBLocalPersistence,
   GoogleAuthProvider, 
   signInWithPopup, 
-  signInWithRedirect,
-  getRedirectResult,
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   signOut 
@@ -28,12 +25,11 @@ const firebaseConfig = {
 // Guarantee default app initialization synchronously
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Auth with explicit localStorage persistence to avoid mobile tab-switching database disconnects
+// Initialize Auth with explicit localStorage persistence and popup resolver removed for mobile web-view stability
 let authInstance;
 try {
   authInstance = initializeAuth(app, {
     persistence: [browserLocalPersistence, indexedDBLocalPersistence],
-    popupRedirectResolver: browserPopupRedirectResolver,
   });
 } catch (e) {
   // If already initialized (e.g., during Vite HMR reloads), reuse existing instance
@@ -43,13 +39,11 @@ try {
 export const auth = authInstance;
 export const googleProvider = new GoogleAuthProvider();
 
-// Export Auth functions
+// Export Auth functions (removed redirect methods to enforce secure popup handling)
 export { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   signInWithPopup, 
-  signInWithRedirect,
-  getRedirectResult,
   signOut 
 };
 
