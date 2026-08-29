@@ -276,7 +276,6 @@ export default function Login({ onLogin }) {
     }
   };
 
-  // Cross-Platform Google Login Handler (Properly bridging native Capacitor Auth tokens into Firebase Web SDK)
   const handleGoogleLogin = async () => {
     setError('');
     setSuccessMessage('');
@@ -287,7 +286,11 @@ export default function Login({ onLogin }) {
 
       if (Capacitor.isNativePlatform()) {
         const result = await FirebaseAuthentication.signInWithGoogle();
-        const credential = GoogleAuthProvider.credential(result.credential?.idToken);
+        const idToken = result.credential?.idToken || result.idToken;
+        if (!idToken) {
+          throw new Error('Google authentication returned an invalid token.');
+        }
+        const credential = GoogleAuthProvider.credential(idToken);
         const userCredential = await signInWithCredential(auth, credential);
         user = userCredential.user;
       } else {
