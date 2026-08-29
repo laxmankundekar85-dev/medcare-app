@@ -396,9 +396,11 @@ app.post('/api/scan-medicine', async (req, res) => {
     const mimeMatch = imageBase64.match(/^data:(image\/\w+);base64,/);
     const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
 
-    const systemPrompt = `You are an expert pharmaceutical AI assistant. Visually identify the medicine from the uploaded image and provide a structured clinical breakdown. Provide only the answer.`;
+    // STRICT PROMPT: Forbids internal reasoning or chain-of-thought blocks
+    const systemPrompt = `You are an expert pharmaceutical and medical device AI assistant. Visually identify the product or item from the uploaded image and provide a clean, structured breakdown (Name, Usage, Dosage/Frequency, and Safety Precautions). 
 
-    // Dynamic model discovery for vision requests
+CRITICAL RULE: Output ONLY the final clinical breakdown response. Do NOT output any internal thoughts, chain-of-thought reasoning steps, numbered analysis headers (like "1. Analyze the user's request", "2. Analyze the image", "3. Identify the object", "4. Address the request", "5. Structure the response", "6. Final check"), or checklists. Provide strictly the answer.`;
+
     const targetModels = await getSupportedGeminiModels(apiKey);
     let replyText = '';
     let lastError = '';
@@ -415,7 +417,7 @@ app.post('/api/scan-medicine', async (req, res) => {
                 data: base64Data
               }
             },
-            { text: "Visually identify this medicine and provide its name, usage, typical dosage, and safety precautions." }
+            { text: "Visually identify this item and provide its name, usage, typical dosage/frequency, and safety precautions." }
           ]
         }],
         system_instruction: {
@@ -440,6 +442,29 @@ app.post('/api/scan-medicine', async (req, res) => {
       } catch (err) {
         lastError = err.message;
       }
+    }
+
+    // ==========================================
+    // AGGRESSIVE SANITIZER: Strip chain-of-thought & reasoning headers
+    // ==========================================
+    if (replyText) {
+      const lines = replyText.split('\n');
+      const filteredLines = lines.filter(line => {
+        const lower = line.toLowerCase();
+        return !(
+          lower.includes('analyze the user') ||
+          lower.includes('analyze the image') ||
+          lower.includes('identify the object') ||
+          lower.includes('address the user') ||
+          lower.includes('structure the response') ||
+          lower.includes('final check') ||
+          lower.includes('does the image') ||
+          lower.includes('text on the box') ||
+          lower.includes('visuals on the box') ||
+          /^\s*\d+\.\s*\*\*/.test(line) // Strips numbered bold lines like "1. **Analyze...**"
+        );
+      });
+      replyText = filteredLines.join('\n').trim();
     }
 
     if (replyText) {
@@ -495,7 +520,7 @@ app.post('/api/scan-qr-text', async (req, res) => {
     let replyText = '';
 
     if (apiKey) {
-      const systemPrompt = `You are an expert pharmaceutical AI assistant. Analyze the scanned QR code text and provide a structured clinical breakdown.`;
+      const systemPrompt = `You are an expert pharmaceutical AI assistant. Analyze the scanned QR code text and provide a structured clinical breakdown. Do not include internal thoughts or reasoning steps.`;
       const result = await callGemini(`Analyze this scanned text/URL: "${textData}"`, apiKey, systemPrompt);
       if (result.success) {
         replyText = result.text;
