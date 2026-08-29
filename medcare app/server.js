@@ -196,7 +196,6 @@ loadRoutes();
 async function callGemini(userMessageText, apiKey, systemInstruction = null) {
   let targetModels = [];
 
-  // Query Google for the exact models active on this API key
   try {
     const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
     if (listRes.ok) {
@@ -296,7 +295,7 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    const systemPrompt = `You are Medcare AI, a helpful, polite, and empathetic medical assistant. Address the user as ${patientName}. Provide direct medical guidance, emergency instructions if needed, and format with clear sections or bullet points. Always end with the disclaimer: "Note: I am an AI assistant. Please consult a qualified doctor for clinical diagnoses." Do not include any internal checklists, rules, or thoughts.`;
+    const systemPrompt = `You are Medcare AI, a polite medical assistant. Address the user as ${patientName}. Provide direct health advice using bullet points.`;
 
     let replyText = '';
 
@@ -312,17 +311,17 @@ app.post('/api/chat', async (req, res) => {
       const lowerMsg = message.toLowerCase();
 
       if (lowerMsg.includes('fever') || lowerMsg.includes('temperature') || lowerMsg.includes('chills') || lowerMsg.includes('hot body')) {
-        replyText = `Hello ${patientName}! 🤒 For fever management:\n\n1. **Rest & Hydration:** Rest in a cool room and sip water or ORS regularly to stay hydrated.\n2. **Cool Sponge:** Apply a clean, damp cloth to your forehead, neck, and wrists.\n3. **Monitor:** Keep track of your body temperature periodically.\n\n💊 **Active Logged Meds:** ${activeMeds}\n\n*Note: If your fever exceeds 102°F (38.8°C) or lasts more than 3 days, please consult a doctor immediately.*`;
+        replyText = `Hello ${patientName}! 🤒 For fever management:\n\n1. **Rest & Hydration:** Rest in a cool room and sip water or ORS regularly to stay hydrated.\n2. **Cool Sponge:** Apply a clean, damp cloth to your forehead, neck, and wrists.\n3. **Monitor:** Keep track of your body temperature periodically.\n\n💊 **Active Logged Meds:** ${activeMeds}`;
       } else if (lowerMsg.includes('snake') || lowerMsg.includes('bite') || lowerMsg.includes('venom') || lowerMsg.includes('serpent')) {
-        replyText = `🚨 **EMERGENCY FIRST AID FOR SNAKE BITE** 🚨\n\nHello ${patientName}! Please stay calm and take these steps **IMMEDIATELY**:\n\n1. 🚑 **CALL EMERGENCY SERVICES (108 / 911) NOW** or get to the nearest ER room.\n2. **Keep Calm & Still:** Movement causes venom to spread faster.\n3. **Immobilize the Area:** Keep the bitten limb slightly below heart level.\n4. **Remove Tight Items:** Take off rings, watches, or tight clothing near the bite.\n5. ❌ **DO NOT:** Cut the wound, suck out venom, or apply ice/tourniquets.\n\n*Note: Anti-venom at a hospital is the only effective treatment. Seek emergency care right away!*`;
+        replyText = `🚨 **EMERGENCY FIRST AID FOR SNAKE BITE** 🚨\n\nHello ${patientName}! Please stay calm and take these steps **IMMEDIATELY**:\n\n1. 🚑 **CALL EMERGENCY SERVICES (108 / 911) NOW** or get to the nearest ER room.\n2. **Keep Calm & Still:** Movement causes venom to spread faster.\n3. **Immobilize the Area:** Keep the bitten limb slightly below heart level.\n4. **Remove Tight Items:** Take off rings, watches, or tight clothing near the bite.\n5. ❌ **DO NOT:** Cut the wound, suck out venom, or apply ice/tourniquets.`;
       } else if (lowerMsg.includes('chest pain') || lowerMsg.includes('heart attack') || lowerMsg.includes('shortness of breath')) {
-        replyText = `🚨 **CRITICAL MEDICAL EMERGENCY** 🚨\n\nHello ${patientName}! Chest pain can be a sign of a cardiac event. Please seek emergency medical care immediately:\n\n1. 🚑 **Call 108 / emergency services right away.**\n2. Sit down and rest in a comfortable, relaxed position.\n3. Do not attempt to drive yourself to the hospital.\n\n*Note: Seek urgent clinical care immediately.*`;
+        replyText = `🚨 **CRITICAL MEDICAL EMERGENCY** 🚨\n\nHello ${patientName}! Chest pain can be a sign of a cardiac event. Please seek emergency medical care immediately:\n\n1. 🚑 **Call 108 / emergency services right away.**\n2. Sit down and rest in a comfortable, relaxed position.\n3. Do not attempt to drive yourself to the hospital.`;
       } else if (lowerMsg.includes('burn') || lowerMsg.includes('bleed') || lowerMsg.includes('cut') || lowerMsg.includes('wound')) {
-        replyText = `Hello ${patientName}! For cuts or burns first-aid:\n\n1. **Bleeding:** Apply firm, continuous pressure with a clean cloth.\n2. **Burns:** Run cool (not ice-cold) tap water over the burn for 10-15 minutes.\n3. **Cleanliness:** Wash mild wounds gently with clean water.\n\n⚠️ Seek doctor evaluation for deep wounds or severe burns.`;
+        replyText = `Hello ${patientName}! For cuts or burns first-aid:\n\n1. **Bleeding:** Apply firm, continuous pressure with a clean cloth.\n2. **Burns:** Run cool (not ice-cold) tap water over the burn for 10-15 minutes.\n3. **Cleanliness:** Wash mild wounds gently with clean water.`;
       } else if (lowerMsg.includes('head') || lowerMsg.includes('headache') || lowerMsg.includes('head pain')) {
-        replyText = `Hello ${patientName}! I am sorry to hear that your head is paining. 🤕\n\n**Immediate Relief Steps:**\n1. Rest in a dark, quiet, well-ventilated room.\n2. Hydrate with water, as dehydration is a primary headache trigger.\n3. Apply a cool compress across your forehead.\n\n💊 **Active Logged Meds:** ${activeMeds}\n\n*Note: Please consult a physician before taking any unprescribed pain relief.*`;
+        replyText = `Hello ${patientName}! I am sorry to hear that your head is paining. 🤕\n\n**Immediate Relief Steps:**\n1. Rest in a dark, quiet, well-ventilated room.\n2. Hydrate with water, as dehydration is a primary headache trigger.\n3. Apply a cool compress across your forehead.\n\n💊 **Active Logged Meds:** ${activeMeds}`;
       } else if (lowerMsg.includes('stomach') || lowerMsg.includes('nausea') || lowerMsg.includes('vomit') || lowerMsg.includes('cramp') || lowerMsg.includes('diarrhea')) {
-        replyText = `Hello ${patientName}! For stomach discomfort:\n\n1. Sip small amounts of clear fluids, ORS, or ginger tea.\n2. Avoid spicy, greasy, or heavy dairy foods.\n3. Rest in an upright position.\n\n*Note: Consult a doctor if severe pain persists.*`;
+        replyText = `Hello ${patientName}! For stomach discomfort:\n\n1. Sip small amounts of clear fluids, ORS, or ginger tea.\n2. Avoid spicy, greasy, or heavy dairy foods.\n3. Rest in an upright position.`;
       } else if (lowerMsg.includes('medication') || lowerMsg.includes('medicine') || lowerMsg.includes('taking') || lowerMsg.includes('dose') || lowerMsg.includes('pill')) {
         replyText = `Hello ${patientName}! 👋\n\nYour current active Medcare medications:\n💊 **${activeMeds}**\n\nPlease follow your prescribed dosage schedule!`;
       } else if (lowerMsg.includes('blood pressure') || lowerMsg.includes('bp') || lowerMsg.includes('hypertension')) {
@@ -332,11 +331,20 @@ app.post('/api/chat', async (req, res) => {
       } else if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('hey')) {
         replyText = `Hello ${patientName}! 👋 Welcome to Medcare Assistant. How can I assist you with your health today?`;
       } else {
-        replyText = `Hello ${patientName}! I am your Medcare AI Assistant.\n\nI can assist you with:\n- First-aid guidance for symptoms (fever, headache, burns, injuries)\n- Checking active medications (**${activeMeds}**)\n- Health & wellness advice\n\nHow can I help you regarding your health right now?\n\n*Note: I am an AI assistant. Please consult a qualified doctor for clinical diagnoses.*`;
+        replyText = `Hello ${patientName}! I am your Medcare AI Assistant.\n\nI can assist you with first-aid guidance, checking active medications (**${activeMeds}**), and health advice.\n\nHow can I help you regarding your health right now?`;
       }
     }
 
-    // AGGRESSIVE BACKEND SANITIZER: Filter out any line containing internal metadata or checklists
+    // Always append the standard disclaimer safely at the end
+    const disclaimer = `\n\n*Note: I am an AI assistant. Please consult a qualified doctor for clinical diagnoses.*`;
+    if (!replyText.includes('Note: I am an AI assistant')) {
+      replyText += disclaimer;
+    }
+
+    // ==========================================
+    // BULLETPROOF BACKEND SANITIZER
+    // Strips out any accidental prompt echoes, user status lines, or checklists
+    // ==========================================
     if (replyText) {
       const lines = replyText.split('\n');
       const filteredLines = lines.filter(line => {
@@ -351,7 +359,11 @@ app.post('/api/chat', async (req, res) => {
           lower.includes('no internal') ||
           lower.includes('role:') ||
           lower.includes('symptom:') ||
-          lower.includes('patient:')
+          lower.includes('patient:') ||
+          lower.includes('user says') ||
+          lower.includes('status:') ||
+          lower.includes('goal:') ||
+          lower.includes('constraint')
         );
       });
       replyText = filteredLines.join('\n').trim();
