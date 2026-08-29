@@ -191,33 +191,32 @@ const loadRoutes = async () => {
 loadRoutes();
 
 // ==========================================
-// DYNAMIC MODEL DISCOVERY & API CALLER
+// HELPER: DYNAMIC MODEL DISCOVERY
 // ==========================================
-async function callGemini(userMessageText, apiKey, systemInstruction = null) {
-  let targetModels = [];
-
+async function getSupportedGeminiModels(apiKey) {
   try {
     const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
     if (listRes.ok) {
       const listData = await listRes.json();
       if (listData?.models && Array.isArray(listData.models)) {
-        targetModels = listData.models
+        const models = listData.models
           .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
           .map(m => m.name.replace(/^models\//, ''))
           .filter(name => !name.includes('embedding') && !name.includes('aqa') && !name.includes('exp'));
+        
+        if (models.length > 0) return models;
       }
     }
   } catch (err) {
-    console.warn('Dynamic model fetch failed, using fallback list:', err.message);
+    console.warn('Dynamic model fetch failed, falling back to defaults:', err.message);
   }
 
-  if (targetModels.length === 0) {
-    targetModels = [
-      'gemini-1.5-flash',
-      'gemini-1.5-pro'
-    ];
-  }
+  // Safe fallback models
+  return ['gemini-1.5-flash', 'gemini-1.5-pro'];
+}
 
+async function callGemini(userMessageText, apiKey, systemInstruction = null) {
+  const targetModels = await getSupportedGeminiModels(apiKey);
   let lastError = '';
 
   for (const model of targetModels) {
@@ -341,7 +340,7 @@ app.post('/api/chat', async (req, res) => {
     }
 
     // ==========================================
-    // BULLETPROOF BACKEND SANITIZER
+    // SANITIZER: Automatically strip internal evaluation checkboxes / prompt echoes
     // ==========================================
     if (replyText) {
       const lines = replyText.split('\n');
@@ -361,7 +360,9 @@ app.post('/api/chat', async (req, res) => {
           lower.includes('user says') ||
           lower.includes('status:') ||
           lower.includes('goal:') ||
-          lower.includes('constraint')
+          lower.includes('constraint') ||
+          lower.includes('persona:') ||
+          lower.includes('content requirements:')
         );
       });
       replyText = filteredLines.join('\n').trim();
@@ -397,8 +398,8 @@ app.post('/api/scan-medicine', async (req, res) => {
 
     const systemPrompt = `You are an expert pharmaceutical AI assistant. Visually identify the medicine from the uploaded image and provide a structured clinical breakdown. Provide only the answer.`;
 
-    // Production-stable models only (removed deprecated experimental flag)
-    const targetModels = ['gemini-1.5-flash', 'gemini-1.5-pro'];
+    // Dynamic model discovery for vision requests
+    const targetModels = await getSupportedGeminiModels(apiKey);
     let replyText = '';
     let lastError = '';
 
@@ -434,7 +435,7 @@ app.post('/api/scan-medicine', async (req, res) => {
           replyText = data.candidates[0].content.parts[0].text;
           break;
         } else if (data?.error) {
-          lastError = data.error.message;
+          lastError = data.error.message || JSON.stringify(data.error);
         }
       } catch (err) {
         lastError = err.message;
