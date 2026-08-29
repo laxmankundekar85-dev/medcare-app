@@ -296,22 +296,7 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    const systemPrompt = `You are Medcare AI, an advanced, polite, and empathetic medical assistant inside the Medcare web application.
-
-PATIENT CONTEXT:
-- Name: ${patientName}
-- Patient ID: ${patientId}
-- Blood Group: ${bloodGroup}
-- Weight: ${weight} kg
-- Active Medications: ${activeMeds}
-
-INSTRUCTIONS:
-1. Address the patient warmly by name (${patientName}).
-2. Respond directly, specifically, and intelligently to any health condition, medical query, emergency situation, or symptom requested.
-3. For critical emergencies (like snake bite, chest pain, heavy bleeding), urge immediate emergency hospitalization and provide crucial immediate first-aid steps.
-4. Format your response cleanly using bullet points or bold text.
-5. Always include a brief disclaimer at the end: "Note: I am an AI assistant. Please consult a qualified doctor for clinical diagnoses."
-6. CRITICAL RULE: Provide ONLY the final medical guidance. Do NOT output internal evaluation checklists, grading criteria, self-assessment lines (like "Address by name: Yes"), checklists, or any internal prompt echoes.`;
+    const systemPrompt = `You are Medcare AI, a helpful, polite, and empathetic medical assistant. Address the user as ${patientName}. Provide direct medical guidance, emergency instructions if needed, and format with clear sections or bullet points. Always end with the disclaimer: "Note: I am an AI assistant. Please consult a qualified doctor for clinical diagnoses." Do not include any internal checklists, rules, or thoughts.`;
 
     let replyText = '';
 
@@ -351,11 +336,25 @@ INSTRUCTIONS:
       }
     }
 
-    // Strip out any accidental internal checklist or grading lines if the AI model outputs them
+    // AGGRESSIVE BACKEND SANITIZER: Filter out any line containing internal metadata or checklists
     if (replyText) {
-      replyText = replyText
-        .replace(/\*\s*(Address by name|Direct\/Specific|Emergency instructions|Clean formatting|Disclaimer included|No internal rules|Urgency|Type|Step).*?:.*/gi, '')
-        .trim();
+      const lines = replyText.split('\n');
+      const filteredLines = lines.filter(line => {
+        const lower = line.toLowerCase();
+        return !(
+          lower.includes('checklist') ||
+          lower.includes('address by name') ||
+          lower.includes('respond directly') ||
+          lower.includes('identify emergencies') ||
+          lower.includes('format:') ||
+          lower.includes('disclaimer included') ||
+          lower.includes('no internal') ||
+          lower.includes('role:') ||
+          lower.includes('symptom:') ||
+          lower.includes('patient:')
+        );
+      });
+      replyText = filteredLines.join('\n').trim();
     }
 
     res.json({ success: true, reply: replyText });
