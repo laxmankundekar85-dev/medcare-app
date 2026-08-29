@@ -204,7 +204,7 @@ async function callGemini(userMessageText, apiKey, systemInstruction = null) {
         targetModels = listData.models
           .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
           .map(m => m.name.replace(/^models\//, ''))
-          .filter(name => !name.includes('embedding') && !name.includes('aqa'));
+          .filter(name => !name.includes('embedding') && !name.includes('aqa') && !name.includes('exp'));
       }
     }
   } catch (err) {
@@ -214,8 +214,7 @@ async function callGemini(userMessageText, apiKey, systemInstruction = null) {
   if (targetModels.length === 0) {
     targetModels = [
       'gemini-1.5-flash',
-      'gemini-1.5-pro',
-      'gemini-2.0-flash-exp'
+      'gemini-1.5-pro'
     ];
   }
 
@@ -343,7 +342,6 @@ app.post('/api/chat', async (req, res) => {
 
     // ==========================================
     // BULLETPROOF BACKEND SANITIZER
-    // Strips out any accidental prompt echoes, user status lines, or checklists
     // ==========================================
     if (replyText) {
       const lines = replyText.split('\n');
@@ -399,7 +397,8 @@ app.post('/api/scan-medicine', async (req, res) => {
 
     const systemPrompt = `You are an expert pharmaceutical AI assistant. Visually identify the medicine from the uploaded image and provide a structured clinical breakdown. Provide only the answer.`;
 
-    const targetModels = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp'];
+    // Production-stable models only (removed deprecated experimental flag)
+    const targetModels = ['gemini-1.5-flash', 'gemini-1.5-pro'];
     let replyText = '';
     let lastError = '';
 
