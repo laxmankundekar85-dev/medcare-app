@@ -311,7 +311,7 @@ INSTRUCTIONS:
 3. For critical emergencies (like snake bite, chest pain, heavy bleeding), urge immediate emergency hospitalization and provide crucial immediate first-aid steps.
 4. Format your response cleanly using bullet points or bold text.
 5. Always include a brief disclaimer at the end: "Note: I am an AI assistant. Please consult a qualified doctor for clinical diagnoses."
-6. Provide ONLY the final response text. Do not output your internal rules, prompt structure, or checklist items.`;
+6. CRITICAL RULE: Provide ONLY the final medical guidance. Do NOT output internal evaluation checklists, grading criteria, self-assessment lines (like "Address by name: Yes"), checklists, or any internal prompt echoes.`;
 
     let replyText = '';
 
@@ -351,6 +351,13 @@ INSTRUCTIONS:
       }
     }
 
+    // Strip out any accidental internal checklist or grading lines if the AI model outputs them
+    if (replyText) {
+      replyText = replyText
+        .replace(/\*\s*(Address by name|Direct\/Specific|Emergency instructions|Clean formatting|Disclaimer included|No internal rules|Urgency|Type|Step).*?:.*/gi, '')
+        .trim();
+    }
+
     res.json({ success: true, reply: replyText });
 
   } catch (error) {
@@ -381,7 +388,6 @@ app.post('/api/scan-medicine', async (req, res) => {
 
     const systemPrompt = `You are an expert pharmaceutical AI assistant. Visually identify the medicine from the uploaded image and provide a structured clinical breakdown. Provide only the answer.`;
 
-    // Note: For image calls, we pass the inline data payload structure directly
     const targetModels = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp'];
     let replyText = '';
     let lastError = '';
