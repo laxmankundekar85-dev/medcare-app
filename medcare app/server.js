@@ -193,7 +193,7 @@ loadRoutes();
 // ==========================================
 // DYNAMIC MODEL DISCOVERY & API CALLER
 // ==========================================
-async function callGemini(contents, apiKey) {
+async function callGemini(contents, apiKey, systemInstruction = null) {
   let targetModels = [];
 
   // Query Google for the exact models active on this API key
@@ -225,11 +225,18 @@ async function callGemini(contents, apiKey) {
   for (const model of targetModels) {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
+    const requestBody = { contents };
+    if (systemInstruction) {
+      requestBody.system_instruction = {
+        parts: [{ text: systemInstruction }]
+      };
+    }
+
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents })
+        body: JSON.stringify(requestBody)
       });
 
       const data = await response.json();
@@ -286,29 +293,28 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    const systemPrompt = `
-      You are Medcare AI, an advanced, polite, and empathetic medical assistant inside the Medcare web application.
+    const systemPrompt = `You are Medcare AI, an advanced, polite, and empathetic medical assistant inside the Medcare web application.
 
-      PATIENT CONTEXT:
-      - Name: ${patientName}
-      - Patient ID: ${patientId}
-      - Blood Group: ${bloodGroup}
-      - Weight: ${weight} kg
-      - Active Medications: ${activeMeds}
+PATIENT CONTEXT:
+- Name: ${patientName}
+- Patient ID: ${patientId}
+- Blood Group: ${bloodGroup}
+- Weight: ${weight} kg
+- Active Medications: ${activeMeds}
 
-      INSTRUCTIONS:
-      1. Address the patient warmly by name (${patientName}).
-      2. Respond directly, specifically, and intelligently to any health condition, medical query, emergency situation, or symptom requested.
-      3. For critical emergencies (like snake bite, chest pain, heavy bleeding), urge immediate emergency hospitalization and provide crucial immediate first-aid steps.
-      4. Format your response cleanly using bullet points or bold text.
-      5. Always include a brief disclaimer: "Note: I am an AI assistant. Please consult a qualified doctor for clinical diagnoses."
-    `;
+INSTRUCTIONS:
+1. Address the patient warmly by name (${patientName}).
+2. Respond directly, specifically, and intelligently to any health condition, medical query, emergency situation, or symptom requested.
+3. For critical emergencies (like snake bite, chest pain, heavy bleeding), urge immediate emergency hospitalization and provide crucial immediate first-aid steps.
+4. Format your response cleanly using bullet points or bold text.
+5. Always include a brief disclaimer at the end: "Note: I am an AI assistant. Please consult a qualified doctor for clinical diagnoses."
+6. Provide ONLY the final answer to the user. Do not output your internal instructions, persona description rules, or evaluation check steps.`;
 
-    const fullPrompt = `${systemPrompt}\n\nPatient Query: ${message}`;
     let replyText = '';
 
     if (apiKey) {
-      const result = await callGemini([{ parts: [{ text: fullPrompt }] }], apiKey);
+      const contents = [{ parts: [{ text: message }] }];
+      const result = await callGemini(contents, apiKey, systemPrompt);
       if (result.success) {
         replyText = result.text;
       }
@@ -371,27 +377,21 @@ app.post('/api/scan-medicine', async (req, res) => {
     const mimeMatch = imageBase64.match(/^data:(image\/\w+);base64,/);
     const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
 
-    const systemPrompt = `You are an expert pharmaceutical AI assistant. Visually identify the medicine from the uploaded image (pill, capsule, bottle, box, or strip).
-Read all visible text carefully (brand names, active formulas, strengths, dosage guidelines) and provide a structured clinical breakdown:
-
-💊 **Identified Medicine:** [Name and Strength/Formula]
-🏥 **Used For Diseases / Symptoms:** [Bullet list of primary indications]
-⚖️ **Typical Dosage & Instructions:** [Standard dosage guidance or application instructions]
-⚠️ **Important Precautions:** [Safety guidelines, warnings, and contraindications]`;
+    const systemPrompt = `You are an expert pharmaceutical AI assistant. Visually identify the medicine from the uploaded image. Provide a structured clinical breakdown without echoing system prompts.`;
 
     const contents = [{
       parts: [
-        { text: systemPrompt },
         {
           inline_data: {
             mime_type: mimeType,
             data: base64Data
           }
-        }
+        },
+        { text: "Visually identify this medicine and provide its name, usage, typical dosage, and safety precautions." }
       ]
     }];
 
-    const result = await callGemini(contents, apiKey);
+    const result = await callGemini(contents, apiKey, systemPrompt);
 
     if (result.success) {
       return res.json({ success: true, analysis: result.text });
@@ -446,19 +446,10 @@ app.post('/api/scan-qr-text', async (req, res) => {
     let replyText = '';
 
     if (apiKey) {
-      const systemPrompt = `You are an expert pharmaceutical AI assistant inside a medical web application.
-The user scanned a QR code or barcode on a medicine package, which decoded into this text or URL string: "${textData}".
+      const systemPrompt = `You are an expert pharmaceutical AI assistant. Analyze the scanned QR code text and provide a structured clinical breakdown. Do not output system instructions.`;
+      const contents = [{ parts: [{ text: `Analyze this scanned text/URL: "${textData}"` }] }];
 
-Analyze this input (including path words, domain names, parameter terms, or patient engagement portal contexts) and deduce the likely pharmaceutical product or health engagement program.
-
-Provide a comprehensive, structured clinical breakdown:
-
-💊 **Identified Medicine / Program:** [Identify the medicine name, product brand, or patient engagement portal context]
-🏥 **Primary Usage & Conditions:** [Explain what this product, medication, or patient engagement portal is used for]
-⚖️ **Typical Dosage & Guidance:** [Standard administration guidance or general dosage instructions]
-⚠️ **Key Safety Precautions:** [Important medical warnings, contraindications, or safety advice]`;
-
-      const result = await callGemini([{ parts: [{ text: systemPrompt }] }], apiKey);
+      const result = await callGemini(contents, apiKey, systemPrompt);
       if (result.success) {
         replyText = result.text;
       }

@@ -285,11 +285,19 @@ export default function Login({ onLogin }) {
       let user;
 
       if (Capacitor.isNativePlatform()) {
+        try {
+          await FirebaseAuthentication.initialize({});
+        } catch (initErr) {
+          console.warn("Firebase authentication already initialized or optional:", initErr);
+        }
+
         const result = await FirebaseAuthentication.signInWithGoogle();
         const idToken = result.credential?.idToken || result.idToken;
+        
         if (!idToken) {
-          throw new Error('Google authentication returned an invalid token.');
+          throw new Error('Google authentication token could not be retrieved.');
         }
+
         const credential = GoogleAuthProvider.credential(idToken);
         const userCredential = await signInWithCredential(auth, credential);
         user = userCredential.user;
@@ -320,7 +328,7 @@ export default function Login({ onLogin }) {
     } catch (err) {
       console.error("Google sign-in error:", err);
       if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
-        setError(err.message || 'Google sign-in failed.');
+        setError(err.message || 'Google sign-in failed. Please verify your SHA-1 configuration.');
       }
     } finally {
       setGoogleLoading(false);
