@@ -54,6 +54,25 @@ Do not take more medicine than the label or your prescription allows, and check 
 Get emergency help now if the pain is sudden and extreme, follows a head injury, or comes with confusion, fainting, weakness or numbness on one side, trouble speaking, vision changes, fever with a stiff neck, seizure, or repeated vomiting. Arrange a medical visit if it is new, keeps returning, or is not improving.`;
   }
 
+  if (/(cold|runny nose|blocked nose|sore throat|cough)/i.test(message) &&
+      /(fever|temperature|chills|hot body)/i.test(message)) {
+    return `I'm sorry you are feeling unwell, ${patientName}. Cold symptoms with a mild fever are often managed with supportive care, but the cause cannot be confirmed here.
+
+For the next 24 hours:
+• Rest and drink frequent small amounts of water, soup, or oral rehydration solution.
+• Check and record your temperature and notice whether breathing is comfortable.
+• Wear light clothing and keep the room comfortably ventilated. Avoid ice baths.
+• Use saline nasal spray or gentle steam for congestion. Warm fluids can soothe the throat.
+• Honey in warm water may help a cough for adults and children over one year old. Do not give honey to a child under one year.
+• Avoid smoke, alcohol, strenuous exercise, and close contact with others while feverish. Wash your hands and consider a suitable COVID or flu test if available.
+
+For fever or aches, use only a medicine whose label is appropriate for your age and health conditions. Do not combine products that contain the same ingredient, and ask a pharmacist first if you are pregnant, treating a child, or have liver, kidney, stomach, or blood-thinning medicine concerns. Antibiotics do not treat ordinary viral colds unless prescribed.
+
+Get urgent medical help for difficulty breathing, chest pain, blue lips, confusion, fainting, a seizure, severe dehydration, a stiff neck, a purple rash, or a rapidly worsening condition. Arrange a medical review if the fever is very high, lasts more than a few days, returns after improving, or symptoms are severe.
+
+To guide you better, tell me your temperature, how long symptoms have lasted, your age group, and whether you have shortness of breath or any long-term medical conditions.`;
+  }
+
   if (/(fever|high temperature|chills|hot body)/i.test(message)) {
     return `For a mild fever, rest, drink frequent small amounts of water or oral rehydration solution, wear light clothing, and check your temperature. Do not use ice baths or take antibiotics unless prescribed.
 
