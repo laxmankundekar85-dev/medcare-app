@@ -73,6 +73,54 @@ Get urgent medical help for difficulty breathing, chest pain, blue lips, confusi
 To guide you better, tell me your temperature, how long symptoms have lasted, your age group, and whether you have shortness of breath or any long-term medical conditions.`;
   }
 
+  if (/(snake bite|snakebite|venomous bite|snake attack)/i.test(message)) {
+    return `A snake bite is an emergency. Call your local emergency number now and arrange transport to an emergency department. Keep the person calm and as still as possible, keep the bitten limb still and below heart level, and remove rings, watches, or tight clothing before swelling increases.
+
+Do not cut or suck the wound, apply ice, use a tourniquet, drink alcohol, or try to catch the snake. Do not wait for symptoms. If safe, remember the snake's colour and pattern or take a distant photo, but never approach it.`;
+  }
+
+  if (/(dog bite|cat bite|animal bite|monkey bite|human bite|animal attack|dog attack)/i.test(message)) {
+    return `Move away from the animal safely. Wash the bite immediately with plenty of running water and soap for 15 minutes, then cover it with a clean dressing. Do not seal a deep wound yourself.
+
+Seek medical care today, even if the wound looks small, because animal bites may need antibiotics, tetanus protection, and rabies assessment. Go urgently for deep wounds, uncontrolled bleeding, bites to the face or hand, an unknown or stray animal, or an animal behaving unusually. Do not try to catch the animal; report it to local animal-control or health authorities if safe.`;
+  }
+
+  if (/(insect bite|bee sting|wasp sting|hornet sting|scorpion sting|spider bite|sting)/i.test(message)) {
+    return `Move away from the insect and gently remove a visible bee stinger by scraping it sideways. Wash the area and apply a cold pack wrapped in cloth for 10–15 minutes. Do not scratch it. Follow the package directions or ask a pharmacist about an antihistamine if itching is troublesome.
+
+Call emergency services immediately for trouble breathing, swelling of the lips or tongue, throat tightness, fainting, widespread hives, vomiting, or rapid worsening. Seek medical care for a sting in the mouth or eye, many stings, severe pain, or signs of infection.`;
+  }
+
+  if (/(allergy|allergic reaction|hives|face swelling|lip swelling)/i.test(message)) {
+    return `For mild localized itching or hives, move away from the suspected trigger, wash the area, and ask a pharmacist about an age-appropriate antihistamine. Avoid the suspected food, medicine, or substance until a clinician reviews it.
+
+Call emergency services immediately for swelling of the lips, tongue, or throat, trouble breathing, wheezing, fainting, confusion, or widespread symptoms. If the person has a prescribed adrenaline auto-injector, use it as instructed and still seek emergency help.`;
+  }
+
+  if (/(asthma|wheezing|breathless|shortness of breath)/i.test(message)) {
+    return `Sit upright, stay calm, and move away from smoke, dust, or the suspected trigger. Use your prescribed reliever inhaler exactly as your asthma action plan says. Do not lie flat or use someone else's inhaler.
+
+Call emergency services if breathing is severe or worsening, you cannot speak in full sentences, your lips look blue, you are drowsy or confused, or your reliever is not helping. Arrange a medical review after an attack or if symptoms are happening more often.`;
+  }
+
+  if (/(diabetes|low sugar|low blood sugar|hypoglycemia|high sugar|high blood sugar)/i.test(message)) {
+    return `If a person with diabetes is awake and may have low blood sugar, check the glucose if possible and follow their diabetes plan. If it is low, give a fast-acting sugary drink or glucose treatment, then recheck as directed. Do not give food or drink to someone who is drowsy, confused, unconscious, or unable to swallow.
+
+Call emergency services for unconsciousness, seizure, severe confusion, repeated vomiting, deep or rapid breathing, or suspected diabetic emergency. Do not change diabetes medicine without the person's clinician.`;
+  }
+
+  if (/(bleeding|heavy bleeding|deep cut|fracture|broken bone|broken arm|broken leg|fall|road accident|car accident|head injury|hit my head)/i.test(message)) {
+    return `For serious injury, make sure the area is safe and call emergency services. For heavy bleeding, press firmly on the wound with clean cloth or gauze and keep pressure continuous. Do not remove a deeply embedded object. Keep a suspected broken limb still in the position found and avoid food or drink if surgery may be needed.
+
+After a head injury, seek urgent care for loss of consciousness, repeated vomiting, worsening headache, confusion, seizure, weakness, unequal pupils, or blood or clear fluid from the nose or ears. Do not move someone with possible neck or spine injury unless there is immediate danger.`;
+  }
+
+  if (/(poison|poisoning|swallowed|overdose|chemical exposure|toxic)/i.test(message)) {
+    return `Poisoning or overdose needs urgent expert advice. Call your local poison-control centre or emergency number now and keep the container, label, or substance name available. Do not make the person vomit, give food or drink, or use a home remedy unless a poison specialist instructs you.
+
+Call emergency services immediately for trouble breathing, seizure, collapse, severe drowsiness, confusion, burns around the mouth, or suspected intentional overdose.`;
+  }
+
   if (/(fever|high temperature|chills|hot body)/i.test(message)) {
     return `For a mild fever, rest, drink frequent small amounts of water or oral rehydration solution, wear light clothing, and check your temperature. Do not use ice baths or take antibiotics unless prescribed.
 
@@ -123,7 +171,7 @@ Arrange a medical visit if the pain is severe, keeps returning, causes numbness 
 };
 
 const hasCuratedGuidance = (message) =>
-  /(brain\s+(is\s+)?pain|head\s+pain|headache|pain\s+in\s+(my|the)\s+head|fever|high temperature|chills|hot body|nausea|vomit|diarrhea|loose motion|stomach upset|blood pressure|\bbp\b|hypertension|leg pain|pain in my leg|leg is paining|leg hurts|calf pain|thigh pain|knee pain|ankle pain|cough|cold|runny nose|blocked nose|sore throat|throat pain|back pain|neck pain|muscle pain|body ache|sprain|strain|cut|minor burn|small burn|scrape|abrasion|wound)/i.test(message);
+  /(brain\s+(is\s+)?pain|head\s+pain|headache|pain\s+in\s+(my|the)\s+head|fever|high temperature|chills|hot body|nausea|vomit|diarrhea|loose motion|stomach upset|blood pressure|\bbp\b|hypertension|leg pain|pain in my leg|leg is paining|leg hurts|calf pain|thigh pain|knee pain|ankle pain|cough|cold|runny nose|blocked nose|sore throat|throat pain|back pain|neck pain|muscle pain|body ache|sprain|strain|cut|minor burn|small burn|scrape|abrasion|wound|snake bite|snakebite|venomous bite|snake attack|dog bite|cat bite|animal bite|monkey bite|human bite|animal attack|dog attack|insect bite|bee sting|wasp sting|hornet sting|scorpion sting|spider bite|sting|allergy|allergic reaction|hives|face swelling|lip swelling|asthma|wheezing|breathless|shortness of breath|diabetes|low sugar|low blood sugar|hypoglycemia|high sugar|high blood sugar|bleeding|heavy bleeding|deep cut|fracture|broken bone|broken arm|broken leg|fall|road accident|car accident|head injury|hit my head|poison|poisoning|swallowed|overdose|chemical exposure|toxic)/i.test(message);
 
 const sanitizeMedicineAnalysis = (value) => {
   const text = sanitizeText(value, 5000);
