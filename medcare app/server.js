@@ -79,12 +79,32 @@ Seek urgent medical care if one leg is suddenly swollen, red, warm, or very tend
 
 Arrange a medical visit if the pain is severe, keeps returning, causes numbness or weakness, or is not improving. Ask a pharmacist before taking a pain reliever if you have kidney disease, stomach ulcers, take blood thinners, are pregnant, or use other medicines.`;
   }
+  
+    if (/(cough|cold|runny nose|blocked nose|sore throat|throat pain)/i.test(message)) {
+      return `For mild cough or cold symptoms, rest, drink warm fluids, and use a clean humidifier or gentle steam. Saline nasal spray can help a blocked nose. Warm water with honey may soothe a cough for adults and children over one year old. Avoid smoke and do not use antibiotics unless prescribed.
 
-  return `I can help with temporary, general care guidance, ${patientName}. Tell me the main symptom, when it started, how severe it is, your age group, and any important conditions or medicines. I cannot diagnose you or replace a clinician. Seek urgent care if symptoms are severe, sudden, rapidly worsening, or affect breathing, consciousness, speech, movement, or cause chest pain.`;
+  Ask a pharmacist before using cough or cold medicines, especially for children, pregnancy, high blood pressure, or if you take other medicines. Seek urgent care for trouble breathing, blue lips, chest pain, confusion, severe dehydration, or symptoms that are rapidly worsening. Arrange a medical review if symptoms are persistent or severe.`;
+    }
+  
+    if (/(back pain|neck pain|muscle pain|body ache|sprain|strain)/i.test(message)) {
+      return `For mild muscle, back, or neck pain, reduce strenuous activity but keep gentle movement if comfortable. Use a wrapped cold pack for a recent injury or swelling, and warmth may help stiffness. Avoid lifting until the pain improves and follow the medicine label if using a pain reliever.
+
+  Get urgent medical help for severe pain after an injury, new weakness or numbness, loss of bladder or bowel control, fever with severe back pain, chest pain, or difficulty breathing. Arrange a medical review if pain is severe, recurrent, or not improving.`;
+    }
+  
+    if (/(cut|minor burn|small burn|scrape|abrasion|wound)/i.test(message)) {
+      return `For a small cut, wash your hands, rinse the wound with clean running water, and apply gentle pressure with clean gauze if it is bleeding. Cover it with a clean dressing. For a minor burn, cool it under clean running water for 20 minutes and do not apply ice, butter, or toothpaste.
+
+  Get urgent care for heavy bleeding, a deep or large wound, an electrical or chemical burn, a burn on the face or genitals, spreading redness, pus, fever, or loss of feeling. Check with a clinician if your tetanus vaccination may not be current.`;
+    }
+
+    return `For a mild, non-emergency symptom, rest, drink fluids, avoid the activity or trigger that makes it worse, and monitor whether it improves. Do not start antibiotics or combine medicines without checking the label or asking a pharmacist.
+
+  Tell me the main symptom, when it started, how severe it is, your age group, and any important conditions or medicines so I can give more relevant general guidance. Seek urgent care for severe or sudden symptoms, breathing difficulty, chest pain, fainting, confusion, heavy bleeding, new weakness or numbness, or rapid worsening.`;
 };
 
 const hasCuratedGuidance = (message) =>
-  /(brain\s+(is\s+)?pain|head\s+pain|headache|pain\s+in\s+(my|the)\s+head|fever|high temperature|chills|hot body|nausea|vomit|diarrhea|loose motion|stomach upset|blood pressure|\bbp\b|hypertension|leg pain|pain in my leg|leg is paining|leg hurts|calf pain|thigh pain|knee pain|ankle pain)/i.test(message);
+  /(brain\s+(is\s+)?pain|head\s+pain|headache|pain\s+in\s+(my|the)\s+head|fever|high temperature|chills|hot body|nausea|vomit|diarrhea|loose motion|stomach upset|blood pressure|\bbp\b|hypertension|leg pain|pain in my leg|leg is paining|leg hurts|calf pain|thigh pain|knee pain|ankle pain|cough|cold|runny nose|blocked nose|sore throat|throat pain|back pain|neck pain|muscle pain|body ache|sprain|strain|cut|minor burn|small burn|scrape|abrasion|wound)/i.test(message);
 
 const sanitizeMedicineAnalysis = (value) => {
   const text = sanitizeText(value, 5000);
