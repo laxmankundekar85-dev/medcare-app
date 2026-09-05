@@ -56,7 +56,10 @@ const sanitizeMedicineAnalysis = (value) => {
   const blockedLine = /(the user wants|analyze the image|apply the system|system instructions|refine for|final check|internal reasoning|chain[- ]of[- ]thought|constraints|prompt says|i have read|i'm using|no personalized dosage|specific headings|no mention|pharmacist verification statement|user says|user intent)/i;
   const headingPattern = /(?:^|\n)\s*(?:\*+\s*)?(Identification|Active ingredient|Strength|Likely use|Warnings|Confidence|What is unreadable)\s*:?/gi;
   const matches = [...text.matchAll(headingPattern)];
-  const start = matches.length > 0 ? matches[matches.length - 1].index : -1;
+  const identificationMatch = matches.find(
+    (match) => match[1].toLowerCase() === 'identification'
+  );
+  const start = identificationMatch?.index ?? -1;
 
   if (start < 0) return '';
 
