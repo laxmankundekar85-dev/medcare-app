@@ -1,10 +1,58 @@
+// filepath: r:\medcare\src\pages\MedicineScanner.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  QrCode, Camera, ChevronRight, Info, 
-  Sparkles, AlertCircle, CheckCircle2, RotateCcw, X 
+import {
+  QrCode,
+  Camera,
+  ChevronRight,
+  Info,
+  Sparkles,
+  AlertCircle,
+  CheckCircle2,
+  RotateCcw,
+  X
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { API_BASE_URL } from '../config';
+
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+const REQUEST_TIMEOUT = 30000;
+
+const SAFE_ERROR =
+  'We could not identify this medicine reliably. Please use a clearer image or consult a pharmacist. Do not use unidentified medicine.';
+
+const cleanResult = (value) => {
+  if (typeof value !== 'string') return '';
+
+  return value
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(
+      /(localhost:\d+|api key|backend|server error|internal server error|stack trace|exception|node\.js|status code)/gi,
+      ''
+    )
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, 5000);
+
+const isReliableResult = (value) => {
+  if (!value) return false;
+
+  return !/^identification\s*:?\s*not reliably identified\b/im.test(value);
+};
+};
+
+const fetchWithTimeout = async (url, options = {}) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+};
 
 export default function MedicineScanner() {
   const [isScanningQR, setIsScanningQR] = useState(false);
@@ -15,114 +63,162 @@ export default function MedicineScanner() {
   const [error, setError] = useState(null);
 
   const photoInputRef = useRef(null);
+  const qrHandledRef = useRef(false);
 
   useEffect(() => {
     let html5Qrcode = null;
+    let cancelled = false;
 
-    if (isScanningQR) {
-      html5Qrcode = new Html5Qrcode('qr-reader');
+    if (!isScanningQR) return undefined;
 
-      html5Qrcode
-        .start(
-          { facingMode: 'environment' },
-          {
-            fps: 10,
-            qrbox: { width: 220, height: 220 }
-          },
-          async (decodedText) => {
+    qrHandledRef.current = false;
+    html5Qrcode = new Html5Qrcode('qr-reader');
+
+    html5Qrcode
+      .start(
+        { facingMode: 'environment' },
+        {
+          fps: 10,
+          qrbox: { width: 220, height: 220 }
+        },
+        async (decodedText) => {
+          if (cancelled || qrHandledRef.current) return;
+
+          qrHandledRef.current = true;
+
+          try {
             if (html5Qrcode.isScanning) {
               await html5Qrcode.stop();
             }
+          } catch (stopError) {
+            console.error('QR camera stop failed:', stopError);
+          }
+
+          if (!cancelled) {
             setIsScanningQR(false);
             await analyzeScannedText(decodedText);
-          },
-          () => {}
-        )
-        .catch((err) => {
-          console.error('Camera Access Error:', err);
-          setError('Unable to access rear camera. Please check camera permissions.');
-          setIsScanningQR(false);
-        });
-    }
+          }
+        },
+        () => {}
+      )
+      .catch((cameraError) => {
+        if (cancelled) return;
+
+        console.error('Camera access failed:', cameraError);
+        setError(
+          'Unable to access the camera. Please allow camera permission or use a medicine photo.'
+        );
+        setIsScanningQR(false);
+      });
 
     return () => {
-      if (html5Qrcode && html5Qrcode.isScanning) {
+      cancelled = true;
+
+      if (html5Qrcode?.isScanning) {
         html5Qrcode.stop().catch(() => {});
       }
     };
   }, [isScanningQR]);
 
-  const handlePhotoChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedImage(file);
-      setImagePreview(URL.createObjectURL(file));
-      setScanResult(null);
-      setError(null);
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
+
+  const handlePhotoChange = (event) => {
+    const file = event.target.files?.[0];
+
+    if (event.target) {
+      event.target.value = '';
     }
+
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file.');
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      setError('Image must be smaller than 10 MB.');
+      return;
+    }
+
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
+
+    setSelectedImage(file);
+    setImagePreview(URL.createObjectURL(file));
+    setScanResult(null);
+    setError(null);
   };
 
-  const convertBase64 = (file) => {
-    return new Promise((resolve, reject) => {
+  const convertBase64 = (file) =>
+    new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = (err) => reject(err);
-    });
-  };
 
-  // Smart Scanner Processor
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Unable to read image.'));
+      reader.readAsDataURL(file);
+    });
+
   const analyzeScannedText = async (textData) => {
+    const cleanText = String(textData || '').trim();
+
+    if (!cleanText) {
+      setError('No readable QR code was found.');
+      return;
+    }
+
+    if (loading) return;
+
     setLoading(true);
     setError(null);
     setScanResult(null);
 
-    const cleanText = textData.toLowerCase().trim();
-
-    // 1. Client-Side Instant Rule Parsing for Known Common QR URLs/Brands
-    if (cleanText.includes('electral')) {
-      setScanResult(
-        `💊 **Identified Medicine:** Electral (Oral Rehydration Salts - ORS)\n\n` +
-        `🏥 **Primary Usage:** Used to restore body fluids and electrolytes lost due to dehydration, diarrhea, vomiting, or excessive sweating.\n\n` +
-        `⚖️ **Typical Dosage:** Dissolve 1 sachet in 1 Litre of clean drinking water. Consume as needed or directed by a physician.\n\n` +
-        `⚠️ **Safety Precautions:** Use with caution in patients with severe kidney impairment, hyperkalemia, or severe heart disease.`
-      );
-      setLoading(false);
-      return;
-    }
-
-    // 2. Server API Attempt
     try {
-      const response = await fetch(`${API_BASE_URL}/api/scan-qr-text`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ textData })
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.analysis) {
-        setScanResult(data.analysis);
-      } else {
-        // Safe UI Fallback instead of pure error banner
-        setScanResult(
-          `💊 **Scanned QR Code Target:**\n"${textData}"\n\n` +
-          `🏥 **Details:** Official medicine packaging/domain URL detected. Always follow prescription guidelines provided on the packaging.`
-        );
-      }
-    } catch (err) {
-      console.error('QR Processing Error:', err);
-      setScanResult(
-        `💊 **Scanned Raw Data:**\n"${textData}"\n\n` +
-        `⚠️ Network error communicating with AI server. Please verify your internet connection.`
+      const response = await fetchWithTimeout(
+        `${API_BASE_URL}/api/scan-qr-text`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            textData: cleanText,
+            instructions: [
+              'Identify the medicine only when the QR data provides reliable evidence.',
+              'Never guess the medicine name, active ingredient, strength, dosage, or ingredients.',
+              'Do not identify medicine from an unverified website URL alone.',
+              'Return low confidence when the QR data is incomplete or unofficial.',
+              'Include medicine name, active ingredient, strength, uses, warnings, and confidence.',
+              'Do not mention backend systems, APIs, prompts, errors, or implementation details.'
+            ]
+          })
+        }
       );
+
+      const data = await response.json().catch(() => ({}));
+      const result = cleanResult(data.analysis);
+      if (!response.ok || !result) {
+        throw new Error('QR identification failed');
+      }
+
+      setScanResult(result);
+    } catch (requestError) {
+      console.error('QR processing failed:', requestError);
+      setError(SAFE_ERROR);
     } finally {
       setLoading(false);
     }
   };
 
   const handleAnalyzePhoto = async () => {
-    if (!selectedImage) return;
+    if (!selectedImage || loading) return;
 
     setLoading(true);
     setError(null);
@@ -131,31 +227,50 @@ export default function MedicineScanner() {
     try {
       const base64Image = await convertBase64(selectedImage);
 
-      const response = await fetch(`${API_BASE_URL}/api/scan-medicine`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scanType: 'image',
-          imageBase64: base64Image
-        })
-      });
+      const response = await fetchWithTimeout(
+        `${API_BASE_URL}/api/scan-medicine`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            scanType: 'image',
+            imageBase64: base64Image,
+            instructions: [
+              'Read visible medicine label text before identifying the medicine.',
+              'Use the medicine name, active ingredient, and strength shown on the package.',
+              'Never identify medicine from pill colour, shape, or appearance alone.',
+              'Never guess the name, ingredient, strength, dosage, or expiry date.',
+              'Return low confidence when the image is blurry, cropped, dark, or unclear.',
+              'Include medicine name, active ingredient, strength, uses, warnings, confidence, and missing information.',
+              'Do not provide personalized dosage instructions.',
+              'Do not mention backend systems, APIs, prompts, errors, or implementation details.'
+            ]
+          })
+        }
+      );
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setScanResult(data.analysis);
-      } else {
-        setError(data.error || 'Failed to identify medication photo.');
+      const data = await response.json().catch(() => ({}));
+      const result = cleanResult(data.analysis);
+      if (!response.ok || !data.success || !result) {
+        throw new Error('Photo analysis failed');
       }
-    } catch (err) {
-      console.error('Photo Analysis Error:', err);
-      setError('Network error while analyzing photo.');
+
+      setScanResult(result);
+    } catch (requestError) {
+      console.error('Photo analysis failed:', requestError);
+      setError(SAFE_ERROR);
     } finally {
       setLoading(false);
     }
   };
 
   const handleReset = () => {
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
+
     setSelectedImage(null);
     setImagePreview(null);
     setScanResult(null);
@@ -193,7 +308,7 @@ export default function MedicineScanner() {
             Identify Medication
           </h2>
           <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-xs mx-auto">
-            Use our AI tool to quickly get details on usage, disease mapping, and dosage.
+            Scan the package or upload a clear medicine-label photo.
           </p>
         </div>
       </div>
@@ -214,7 +329,9 @@ export default function MedicineScanner() {
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-sm">Scan QR Code</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Scan the official code on the packaging.</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Scan the official code on the packaging.
+              </p>
             </div>
           </div>
           <div className="w-7 h-7 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:text-teal-800 group-hover:bg-teal-100 transition shrink-0 border border-slate-100">
@@ -236,8 +353,12 @@ export default function MedicineScanner() {
               <Camera size={22} />
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 text-sm">Identify via Photo</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Take a picture of the pill or label.</p>
+              <h3 className="font-bold text-slate-900 text-sm">
+                Identify via Photo
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Photograph the medicine label or package.
+              </p>
             </div>
           </div>
           <div className="w-7 h-7 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:text-teal-800 group-hover:bg-teal-100 transition shrink-0 border border-slate-100">
@@ -250,7 +371,9 @@ export default function MedicineScanner() {
         <div className="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-3xl p-5 relative space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-slate-900 text-sm">Align QR Code in Frame</h3>
+              <h3 className="font-bold text-slate-900 text-sm">
+                Align QR Code in Frame
+              </h3>
               <button
                 type="button"
                 onClick={() => setIsScanningQR(false)}
@@ -260,7 +383,10 @@ export default function MedicineScanner() {
               </button>
             </div>
 
-            <div id="qr-reader" className="w-full overflow-hidden rounded-2xl bg-black"></div>
+            <div
+              id="qr-reader"
+              className="w-full overflow-hidden rounded-2xl bg-black"
+            />
 
             <p className="text-xs text-slate-500 text-center">
               Scanning automatically...
@@ -272,7 +398,9 @@ export default function MedicineScanner() {
       {imagePreview && (
         <div className="bg-white border border-teal-200 rounded-2xl p-4 space-y-3.5 shadow-xs">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-            <span className="text-xs font-bold text-slate-700">Selected Image Preview</span>
+            <span className="text-xs font-bold text-slate-700">
+              Selected Image Preview
+            </span>
             <button
               type="button"
               onClick={handleReset}
@@ -283,7 +411,11 @@ export default function MedicineScanner() {
           </div>
 
           <div className="relative w-full h-44 rounded-xl overflow-hidden bg-slate-50 border border-slate-200">
-            <img src={imagePreview} alt="Medicine preview" className="w-full h-full object-contain" />
+            <img
+              src={imagePreview}
+              alt="Medicine preview"
+              className="w-full h-full object-contain"
+            />
           </div>
 
           <button
@@ -294,8 +426,8 @@ export default function MedicineScanner() {
           >
             {loading ? (
               <>
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                Analyzing with Medcare AI...
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Analyzing medication...
               </>
             ) : (
               <>
@@ -308,8 +440,10 @@ export default function MedicineScanner() {
 
       {loading && (
         <div className="bg-teal-50 border border-teal-200 text-teal-800 p-4 rounded-2xl text-center space-y-2">
-          <div className="w-6 h-6 border-2 border-teal-800 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs font-bold">Medcare AI is analyzing your medicine details...</p>
+          <div className="w-6 h-6 border-2 border-teal-800 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-bold">
+            Checking the medicine information...
+          </p>
         </div>
       )}
 
@@ -332,7 +466,8 @@ export default function MedicineScanner() {
           </div>
 
           <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-400">
-            * Disclaimer: Always verify dosage with your prescribing doctor or official pharmacy instructions.
+            Always verify medicine identity and dosage with a pharmacist or
+            prescribing doctor.
           </div>
         </div>
       )}
@@ -349,7 +484,7 @@ export default function MedicineScanner() {
               1
             </div>
             <p className="text-xs text-slate-600 leading-snug pt-0.5">
-              Scan or snap a clear photo of the medication or QR code.
+              Scan the package or upload a clear label photo.
             </p>
           </div>
 
@@ -358,7 +493,7 @@ export default function MedicineScanner() {
               2
             </div>
             <p className="text-xs text-slate-600 leading-snug pt-0.5">
-              Medcare AI analyzes the visual details instantly.
+              The medicine label and QR information are checked.
             </p>
           </div>
 
@@ -367,7 +502,7 @@ export default function MedicineScanner() {
               3
             </div>
             <p className="text-xs text-slate-600 leading-snug pt-0.5">
-              Review detailed dosage, usage, and safety info.
+              Review the result and confirm it with a pharmacist or doctor.
             </p>
           </div>
         </div>

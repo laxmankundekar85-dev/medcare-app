@@ -13,6 +13,27 @@ const require = createRequire(import.meta.url);
 
 const app = express();
 
+const PUBLIC_ERROR = 'Unable to process the request. Please try again.';
+const MEDICINE_ERROR =
+  'Medicine identification was inconclusive. Please upload a clearer label photo or consult a pharmacist.';
+
+const sanitizeText = (value, maxLength = 5000) => {
+  if (typeof value !== 'string') return '';
+
+  return value
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(
+      /(localhost:\d+|api key|backend|server error|internal server error|stack trace|exception|node\.js|status code|system prompt)/gi,
+      ''
+    )
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, maxLength);
+};
+
+const safeJsonError = (res, status = 500) =>
+  res.status(status).json({ success: false, error: PUBLIC_ERROR });
+
 // ==========================================
 // 1. MIDDLEWARE & STRICT CORS FOR MOBILE & VERCEL
 // ==========================================
@@ -217,7 +238,6 @@ async function getSupportedGeminiModels(apiKey) {
 
 async function callGemini(userMessageText, apiKey, systemInstruction = null) {
   const targetModels = await getSupportedGeminiModels(apiKey);
-  let lastError = '';
 
   for (const model of targetModels) {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -236,22 +256,32 @@ async function callGemini(userMessageText, apiKey, systemInstruction = null) {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify({
+          ...requestBody,
+          generationConfig: {
+            temperature: 0.2,
+            topP: 0.8,
+            maxOutputTokens: 1200
+          }
+        }),
+        signal: AbortSignal.timeout(30000)
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-        return { success: true, text: data.candidates[0].content.parts[0].text, modelUsed: model };
-      } else if (data?.error) {
-        lastError = data.error.message || JSON.stringify(data.error);
+        return {
+          success: true,
+          text: sanitizeText(data.candidates[0].content.parts[0].text),
+          modelUsed: model
+        };
       }
-    } catch (fetchErr) {
-      lastError = fetchErr.message;
+    } catch (fetchError) {
+      console.error('Gemini request failed:', fetchError.message);
     }
   }
 
-  return { success: false, error: lastError };
+  return { success: false };
 }
 
 // ==========================================
@@ -259,18 +289,18 @@ async function callGemini(userMessageText, apiKey, systemInstruction = null) {
 // ==========================================
 app.post('/api/chat', async (req, res) => {
   try {
-    const { userId, message, userContext } = req.body;
+    const { userId, message, userContext, instructions } = req.body;
 
-    if (!message) {
-      return res.status(400).json({ error: 'Message content is required.' });
+    if (typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please enter a message.'
+      });
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
 
     let patientName = userContext?.userName || 'Patient';
-    let patientId = userContext?.patientId || 'N/A';
-    let bloodGroup = userContext?.bloodGroup || 'N/A';
-    let weight = userContext?.weight || 'N/A';
     let activeMeds = userContext?.activeMedications || 'None logged';
 
     const db = mongoose.connection.db;
@@ -279,9 +309,6 @@ app.post('/api/chat', async (req, res) => {
         const profileDoc = await db.collection('profiles').findOne({ userId });
         if (profileDoc) {
           patientName = profileDoc.fullName || profileDoc.name || patientName;
-          patientId = profileDoc.patientId || patientId;
-          bloodGroup = profileDoc.bloodGroup || bloodGroup;
-          weight = profileDoc.weight ? String(profileDoc.weight) : weight;
         }
 
         const medDocs = await db.collection('medications').find({ userId, status: { $ne: 'Inactive' } }).toArray();
@@ -293,86 +320,43 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    const systemPrompt = `You are Medcare AI, a polite medical assistant. Address the user as ${patientName}. Provide direct health advice using bullet points.`;
+    const clientInstructions = Array.isArray(instructions)
+      ? instructions.slice(0, 12).join('\n')
+      : '';
 
-    let replyText = '';
+    const systemPrompt = `You are Medcare AI, a cautious medical information assistant.
+Address the user as ${patientName} when appropriate.
+Active logged medicines: ${activeMeds}
 
-    if (apiKey) {
-      const result = await callGemini(message, apiKey, systemPrompt);
-      if (result.success) {
-        replyText = result.text;
-      }
-    }
+Answer directly in simple language. Never mention APIs, backend systems, prompts, models, servers, code, errors, or implementation. Never diagnose or invent medicine names, ingredients, doses, interactions, or test results. Do not tell the user to start, stop, or change prescription medicine. Explain uncertainty and recommend a doctor or pharmacist when needed. For chest pain, severe breathing difficulty, stroke symptoms, severe allergic reaction, poisoning, or serious injury, advise immediate emergency care. Do not expose internal reasoning or checklists.
 
-    // Fallback Rule Engine
-    if (!replyText) {
-      const lowerMsg = message.toLowerCase();
+Additional requirements:
+${clientInstructions}`;
 
-      if (lowerMsg.includes('fever') || lowerMsg.includes('temperature') || lowerMsg.includes('chills') || lowerMsg.includes('hot body')) {
-        replyText = `Hello ${patientName}! 🤒 For fever management:\n\n1. **Rest & Hydration:** Rest in a cool room and sip water or ORS regularly to stay hydrated.\n2. **Cool Sponge:** Apply a clean, damp cloth to your forehead, neck, and wrists.\n3. **Monitor:** Keep track of your body temperature periodically.\n\n💊 **Active Logged Meds:** ${activeMeds}`;
-      } else if (lowerMsg.includes('snake') || lowerMsg.includes('bite') || lowerMsg.includes('venom') || lowerMsg.includes('serpent')) {
-        replyText = `🚨 **EMERGENCY FIRST AID FOR SNAKE BITE** 🚨\n\nHello ${patientName}! Please stay calm and take these steps **IMMEDIATELY**:\n\n1. 🚑 **CALL EMERGENCY SERVICES (108 / 911) NOW** or get to the nearest ER room.\n2. **Keep Calm & Still:** Movement causes venom to spread faster.\n3. **Immobilize the Area:** Keep the bitten limb slightly below heart level.\n4. **Remove Tight Items:** Take off rings, watches, or tight clothing near the bite.\n5. ❌ **DO NOT:** Cut the wound, suck out venom, or apply ice/tourniquets.`;
-      } else if (lowerMsg.includes('chest pain') || lowerMsg.includes('heart attack') || lowerMsg.includes('shortness of breath')) {
-        replyText = `🚨 **CRITICAL MEDICAL EMERGENCY** 🚨\n\nHello ${patientName}! Chest pain can be a sign of a cardiac event. Please seek emergency medical care immediately:\n\n1. 🚑 **Call 108 / emergency services right away.**\n2. Sit down and rest in a comfortable, relaxed position.\n3. Do not attempt to drive yourself to the hospital.`;
-      } else if (lowerMsg.includes('burn') || lowerMsg.includes('bleed') || lowerMsg.includes('cut') || lowerMsg.includes('wound')) {
-        replyText = `Hello ${patientName}! For cuts or burns first-aid:\n\n1. **Bleeding:** Apply firm, continuous pressure with a clean cloth.\n2. **Burns:** Run cool (not ice-cold) tap water over the burn for 10-15 minutes.\n3. **Cleanliness:** Wash mild wounds gently with clean water.`;
-      } else if (lowerMsg.includes('head') || lowerMsg.includes('headache') || lowerMsg.includes('head pain')) {
-        replyText = `Hello ${patientName}! I am sorry to hear that your head is paining. 🤕\n\n**Immediate Relief Steps:**\n1. Rest in a dark, quiet, well-ventilated room.\n2. Hydrate with water, as dehydration is a primary headache trigger.\n3. Apply a cool compress across your forehead.\n\n💊 **Active Logged Meds:** ${activeMeds}`;
-      } else if (lowerMsg.includes('stomach') || lowerMsg.includes('nausea') || lowerMsg.includes('vomit') || lowerMsg.includes('cramp') || lowerMsg.includes('diarrhea')) {
-        replyText = `Hello ${patientName}! For stomach discomfort:\n\n1. Sip small amounts of clear fluids, ORS, or ginger tea.\n2. Avoid spicy, greasy, or heavy dairy foods.\n3. Rest in an upright position.`;
-      } else if (lowerMsg.includes('medication') || lowerMsg.includes('medicine') || lowerMsg.includes('taking') || lowerMsg.includes('dose') || lowerMsg.includes('pill')) {
-        replyText = `Hello ${patientName}! 👋\n\nYour current active Medcare medications:\n💊 **${activeMeds}**\n\nPlease follow your prescribed dosage schedule!`;
-      } else if (lowerMsg.includes('blood pressure') || lowerMsg.includes('bp') || lowerMsg.includes('hypertension')) {
-        replyText = `Hello ${patientName}! Core tips for healthy blood pressure:\n1. Reduce daily sodium (salt) intake.\n2. Engage in 30 mins of daily light-to-moderate exercise.\n3. Manage stress levels and stay hydrated.`;
-      } else if (lowerMsg.includes('hydration') || lowerMsg.includes('water') || lowerMsg.includes('drink')) {
-        replyText = `Hello ${patientName}! Aim for 2.5 to 3 Liters of water daily for optimal organ health. 💧`;
-      } else if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('hey')) {
-        replyText = `Hello ${patientName}! 👋 Welcome to Medcare Assistant. How can I assist you with your health today?`;
-      } else {
-        replyText = `Hello ${patientName}! I am your Medcare AI Assistant.\n\nI can assist you with first-aid guidance, checking active medications (**${activeMeds}**), and health advice.\n\nHow can I help you regarding your health right now?`;
-      }
-    }
-
-    // Always append the standard disclaimer safely at the end
-    const disclaimer = `\n\n*Note: I am an AI assistant. Please consult a qualified doctor for clinical diagnoses.*`;
-    if (!replyText.includes('Note: I am an AI assistant')) {
-      replyText += disclaimer;
-    }
-
-    // ==========================================
-    // SANITIZER: Automatically strip internal evaluation checkboxes / prompt echoes
-    // ==========================================
-    if (replyText) {
-      const lines = replyText.split('\n');
-      const filteredLines = lines.filter(line => {
-        const lower = line.toLowerCase();
-        return !(
-          lower.includes('checklist') ||
-          lower.includes('address by name') ||
-          lower.includes('respond directly') ||
-          lower.includes('identify emergencies') ||
-          lower.includes('format:') ||
-          lower.includes('disclaimer included') ||
-          lower.includes('no internal') ||
-          lower.includes('role:') ||
-          lower.includes('symptom:') ||
-          lower.includes('patient:') ||
-          lower.includes('user says') ||
-          lower.includes('status:') ||
-          lower.includes('goal:') ||
-          lower.includes('constraint') ||
-          lower.includes('persona:') ||
-          lower.includes('content requirements:')
-        );
+    if (!apiKey) {
+      return res.json({
+        success: true,
+        reply: 'The medical assistant is temporarily unavailable. Please consult a doctor or pharmacist for medical advice.'
       });
-      replyText = filteredLines.join('\n').trim();
     }
 
-    res.json({ success: true, reply: replyText });
+    const result = await callGemini(message.trim().slice(0, 4000), apiKey, systemPrompt);
+
+    if (!result.success || !result.text) {
+      return res.json({
+        success: true,
+        reply: 'I could not prepare a reliable answer. Please try again or consult a healthcare professional.'
+      });
+    }
+
+    return res.json({
+      success: true,
+      reply: `${sanitizeText(result.text)}\n\nNote: This is general information, not a diagnosis.`
+    });
 
   } catch (error) {
     console.error('❌ Gemini AI Chat Route Error:', error.message);
-    res.status(500).json({ error: error.message || 'Failed to generate AI response.' });
+    return safeJsonError(res);
   }
 });
 
@@ -383,102 +367,84 @@ app.post('/api/scan-medicine', async (req, res) => {
   try {
     const { imageBase64 } = req.body;
 
-    if (!imageBase64) {
-      return res.status(400).json({ success: false, error: 'Image data is required.' });
+    if (
+      typeof imageBase64 !== 'string' ||
+      !/^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(imageBase64)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: MEDICINE_ERROR
+      });
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({ success: false, error: 'GEMINI_API_KEY is missing in server environment variables.' });
+      return res.json({ success: false, error: MEDICINE_ERROR });
     }
 
-    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-    const mimeMatch = imageBase64.match(/^data:(image\/\w+);base64,/);
-    const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const mimeMatch = imageBase64.match(
+      /^data:(image\/[a-zA-Z0-9.+-]+);base64,/
+    );
+    const mimeType = mimeMatch?.[1] || 'image/jpeg';
+    const base64Data = imageBase64.replace(/^data:image\/[^;]+;base64,/, '');
 
-    // STRICT PROMPT: Forbids internal reasoning or chain-of-thought blocks
-    const systemPrompt = `You are an expert pharmaceutical and medical device AI assistant. Visually identify the product or item from the uploaded image and provide a clean, structured breakdown (Name, Usage, Dosage/Frequency, and Safety Precautions). 
+    const systemPrompt = `You are a cautious medicine-label verification assistant.
+Return only a concise final report with these headings:
+Identification
+Active ingredient
+Strength
+Likely use
+Warnings
+Confidence
+What is unreadable
 
-CRITICAL RULE: Output ONLY the final clinical breakdown response. Do NOT output any internal thoughts, chain-of-thought reasoning steps, numbered analysis headers (like "1. Analyze the user's request", "2. Analyze the image", "3. Identify the object", "4. Address the request", "5. Structure the response", "6. Final check"), or checklists. Provide strictly the answer.`;
+Read printed label text before identifying the medicine. Never identify medicine from colour, shape, logo, or appearance alone. Never guess a name, ingredient, strength, expiry date, or dosage. If the label is unclear or evidence conflicts, say "Not reliably identified". Do not provide personalized dosage instructions. Do not mention APIs, backend systems, prompts, models, errors, or internal reasoning. State that a pharmacist should verify the result.`;
 
     const targetModels = await getSupportedGeminiModels(apiKey);
     let replyText = '';
-    let lastError = '';
 
     for (const model of targetModels) {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-      const requestBody = {
-        contents: [{
-          parts: [
-            {
-              inline_data: {
-                mime_type: mimeType,
-                data: base64Data
-              }
-            },
-            { text: "Visually identify this item and provide its name, usage, typical dosage/frequency, and safety precautions." }
-          ]
-        }],
-        system_instruction: {
-          parts: [{ text: systemPrompt }]
-        }
-      };
-
       try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody)
+          signal: AbortSignal.timeout(30000),
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: [{
+              parts: [
+                { inline_data: { mime_type: mimeType, data: base64Data } },
+                { text: 'Verify the medicine label conservatively.' }
+              ]
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              topP: 0.7,
+              maxOutputTokens: 1000
+            }
+          })
         });
 
-        const data = await response.json();
-        if (response.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-          replyText = data.candidates[0].content.parts[0].text;
+        const data = await response.json().catch(() => ({}));
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (response.ok && text) {
+          replyText = sanitizeText(text);
           break;
-        } else if (data?.error) {
-          lastError = data.error.message || JSON.stringify(data.error);
         }
-      } catch (err) {
-        lastError = err.message;
+      } catch (error) {
+        console.error('Medicine vision request failed:', error.message);
       }
     }
 
-    // ==========================================
-    // AGGRESSIVE SANITIZER: Strip chain-of-thought & reasoning headers
-    // ==========================================
-    if (replyText) {
-      const lines = replyText.split('\n');
-      const filteredLines = lines.filter(line => {
-        const lower = line.toLowerCase();
-        return !(
-          lower.includes('analyze the user') ||
-          lower.includes('analyze the image') ||
-          lower.includes('identify the object') ||
-          lower.includes('address the user') ||
-          lower.includes('structure the response') ||
-          lower.includes('final check') ||
-          lower.includes('does the image') ||
-          lower.includes('text on the box') ||
-          lower.includes('visuals on the box') ||
-          /^\s*\d+\.\s*\*\*/.test(line) // Strips numbered bold lines like "1. **Analyze...**"
-        );
-      });
-      replyText = filteredLines.join('\n').trim();
-    }
+    if (!replyText) return res.json({ success: false, error: MEDICINE_ERROR });
 
-    if (replyText) {
-      return res.json({ success: true, analysis: replyText });
-    }
-
-    return res.status(400).json({
-      success: false,
-      error: `AI analysis failed: ${lastError || 'Please ensure the photo is clear and API key is valid.'}`
-    });
+    return res.json({ success: true, analysis: replyText });
 
   } catch (error) {
     console.error('❌ Medicine Scan API Error:', error.message);
-    res.status(500).json({ success: false, error: error.message || 'Server error while processing medicine scan.' });
+    return res.json({ success: false, error: MEDICINE_ERROR });
   }
 });
 
@@ -488,55 +454,41 @@ CRITICAL RULE: Output ONLY the final clinical breakdown response. Do NOT output 
 app.post('/api/scan-qr-text', async (req, res) => {
   try {
     const { textData } = req.body;
+    const value = String(textData || '').trim();
 
-    if (!textData) {
-      return res.status(400).json({ success: false, error: 'Scanned text/data is required.' });
-    }
-
-    const cleanInput = String(textData).trim().toLowerCase();
-
-    // Fast Rule Pre-Parser for Common Brands / Keywords
-    if (cleanInput.includes('electral')) {
-      return res.json({
-        success: true,
-        analysis: `💊 **Identified Product:** Electral (Oral Rehydration Salts - ORS)\n\n` +
-                  `🏥 **Primary Usage:** Restores vital body fluids and electrolytes lost due to dehydration, diarrhea, or excessive sweating.\n\n` +
-                  `⚖️ **Typical Dosage:** Dissolve 1 sachet in 1 Litre of clean drinking water. Consume as directed.\n\n` +
-                  `⚠️ **Safety Precautions:** Exercise caution in patients with severe renal impairment or hyperkalemia.`
-      });
-    }
-
-    if (cleanInput.includes('crocin') || cleanInput.includes('paracetamol')) {
-      return res.json({
-        success: true,
-        analysis: `💊 **Identified Product:** Paracetamol / Crocin\n\n` +
-                  `🏥 **Primary Usage:** Used to treat mild-to-moderate fever and alleviate body aches or headaches.\n\n` +
-                  `⚖️ **Typical Dosage:** 500mg - 650mg taken every 4-6 hours as required. Do not exceed 4000mg daily.\n\n` +
-                  `⚠️ **Safety Precautions:** Do not combine with other acetaminophen products to prevent liver toxicity.`
+    if (!value) {
+      return res.status(400).json({
+        success: false,
+        error: 'No readable QR code was found.'
       });
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
-    let replyText = '';
-
-    if (apiKey) {
-      const systemPrompt = `You are an expert pharmaceutical AI assistant. Analyze the scanned QR code text and provide a structured clinical breakdown. Do not include internal thoughts or reasoning steps.`;
-      const result = await callGemini(`Analyze this scanned text/URL: "${textData}"`, apiKey, systemPrompt);
-      if (result.success) {
-        replyText = result.text;
-      }
+    if (!apiKey) {
+      return res.json({ success: false, error: MEDICINE_ERROR });
     }
 
-    if (!replyText) {
-      replyText = `💊 **Scanned Code Target:**\n"${textData}"\n\n` +
-                  `🏥 **Analysis:** Official pharmaceutical / patient engagement reference link detected. Please open the link in your browser or consult the product box for complete prescription details.`;
+    const systemPrompt = `You are a cautious pharmaceutical verification assistant.
+Analyze medicine QR data only when it contains reliable product information.
+Do not identify a medicine from a URL alone. Never guess the medicine name, ingredient, strength, dosage, or expiry date. If evidence is insufficient, say "Not reliably identified".
+Return only these headings: Identification, Active ingredient, Strength, Likely use, Warnings, Confidence, Verification needed.
+Do not repeat the full QR payload. Do not mention APIs, backend systems, prompts, errors, models, or internal reasoning.`;
+
+    const result = await callGemini(
+      `Analyze this scanned medicine QR payload:\n${value.slice(0, 2000)}`,
+      apiKey,
+      systemPrompt
+    );
+
+    if (!result.success || !result.text) {
+      return res.json({ success: false, error: MEDICINE_ERROR });
     }
 
-    return res.json({ success: true, analysis: replyText });
+    return res.json({ success: true, analysis: sanitizeText(result.text) });
 
   } catch (error) {
     console.error('❌ QR Text API Error:', error.message);
-    res.status(500).json({ success: false, error: error.message || 'Server error processing QR text.' });
+    return res.json({ success: false, error: MEDICINE_ERROR });
   }
 });
 
