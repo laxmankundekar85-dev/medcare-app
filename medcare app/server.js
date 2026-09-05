@@ -46,10 +46,10 @@ const sanitizeAssistantReply = (value) => {
 };
 
 const getProfessionalFallback = (message, patientName) => {
-  if (/(brain\s+(is\s+)?pain|head\s+pain|headache|pain\s+in\s+(my|the)\s+head)/i.test(message)) {
+  if (/(brain\s+(is\s+)?pain|head\s+pain|headache|head\s+ache|pain\s+in\s+(my|the)\s+head)/i.test(message)) {
     return `I'm sorry you are experiencing this, ${patientName}. For mild head pain, rest in a quiet, dim room, drink water slowly, eat something light if you have not eaten, and try a cool cloth on your forehead or neck. Reduce screen brightness and avoid alcohol.
 
-Do not take more medicine than the label or your prescription allows, and check with a pharmacist before using a pain reliever if you have liver or kidney disease, ulcers, take blood thinners, are pregnant, or already use other medicines containing paracetamol or acetaminophen.
+For temporary pain relief, an adult may consider paracetamol/acetaminophen or ibuprofen only if the product label says it is suitable for them and they have no medical reason to avoid it. Do not combine products containing the same ingredient and do not exceed the label dose. Ask a pharmacist first if you have liver or kidney disease, stomach ulcers, take blood thinners, are pregnant, are under 18, or already use other medicines.
 
 Get emergency help now if the pain is sudden and extreme, follows a head injury, or comes with confusion, fainting, weakness or numbness on one side, trouble speaking, vision changes, fever with a stiff neck, seizure, or repeated vomiting. Arrange a medical visit if it is new, keeps returning, or is not improving.`;
   }
@@ -180,7 +180,7 @@ Arrange a medical visit if the pain is severe, keeps returning, causes numbness 
 };
 
 const hasCuratedGuidance = (message) =>
-  /(brain\s+(is\s+)?pain|head\s+pain|headache|pain\s+in\s+(my|the)\s+head|fever|high temperature|chills|hot body|nausea|vomit|diarrhea|loose motion|stomach upset|blood pressure|\bbp\b|hypertension|leg pain|pain in my leg|leg is paining|leg hurts|calf pain|thigh pain|knee pain|ankle pain|cough|cold|runny nose|blocked nose|sore throat|throat pain|back pain|neck pain|muscle pain|body ache|sprain|strain|cut|minor burn|small burn|scrape|abrasion|wound|snake bite|snakebite|venomous bite|snake attack|dog bite|cat bite|animal bite|monkey bite|human bite|animal attack|dog attack|insect bite|bee sting|wasp sting|hornet sting|scorpion sting|spider bite|sting|allergy|allergic reaction|hives|face swelling|lip swelling|asthma|wheezing|breathless|shortness of breath|diabetes|low sugar|low blood sugar|hypoglycemia|high sugar|high blood sugar|bleeding|heavy bleeding|deep cut|fracture|broken bone|broken arm|broken leg|leg is broken|arm is broken|bone is broken|i broke my leg|i broke my arm|fall|road accident|car accident|head injury|hit my head|poison|poisoning|swallowed|overdose|chemical exposure|toxic)/i.test(message);
+  /(brain\s+(is\s+)?pain|head\s+pain|headache|head\s+ache|pain\s+in\s+(my|the)\s+head|fever|high temperature|chills|hot body|nausea|vomit|diarrhea|loose motion|stomach upset|blood pressure|\bbp\b|hypertension|leg pain|pain in my leg|leg is paining|leg hurts|calf pain|thigh pain|knee pain|ankle pain|cough|cold|runny nose|blocked nose|sore throat|throat pain|back pain|neck pain|muscle pain|body ache|sprain|strain|cut|minor burn|small burn|scrape|abrasion|wound|snake bite|snakebite|venomous bite|snake attack|dog bite|cat bite|animal bite|monkey bite|human bite|animal attack|dog attack|insect bite|bee sting|wasp sting|hornet sting|scorpion sting|spider bite|sting|allergy|allergic reaction|hives|face swelling|lip swelling|asthma|wheezing|breathless|shortness of breath|diabetes|low sugar|low blood sugar|hypoglycemia|high sugar|high blood sugar|bleeding|heavy bleeding|deep cut|fracture|broken bone|broken arm|broken leg|leg is broken|arm is broken|bone is broken|i broke my leg|i broke my arm|fall|road accident|car accident|head injury|hit my head|poison|poisoning|swallowed|overdose|chemical exposure|toxic)/i.test(message);
 
 const sanitizeMedicineAnalysis = (value) => {
   const text = sanitizeText(value, 5000);
