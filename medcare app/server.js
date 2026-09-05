@@ -72,11 +72,19 @@ Seek medical care urgently for blood in vomit or stool, severe or worsening bell
 Do not change or stop blood-pressure medicine without a clinician. If a reading is 180/120 or higher, repeat it after five minutes of rest. Get emergency help immediately if it remains that high or comes with chest pain, severe headache, shortness of breath, weakness, confusion, or vision changes.`;
   }
 
+  if (/(leg pain|pain in my leg|leg is paining|leg hurts|calf pain|thigh pain|knee pain|ankle pain)/i.test(message)) {
+    return `For mild leg pain, rest from the activity that caused it, keep the leg comfortably elevated, and use a wrapped cold pack for 15–20 minutes at a time during the first day if there is soreness or swelling. Avoid massage or strenuous exercise until the cause is clearer.
+
+Seek urgent medical care if one leg is suddenly swollen, red, warm, or very tender, if you cannot walk, or if the pain followed a serious injury. Call emergency services immediately if leg pain occurs with chest pain, shortness of breath, fainting, or coughing blood.
+
+Arrange a medical visit if the pain is severe, keeps returning, causes numbness or weakness, or is not improving. Ask a pharmacist before taking a pain reliever if you have kidney disease, stomach ulcers, take blood thinners, are pregnant, or use other medicines.`;
+  }
+
   return `I can help with temporary, general care guidance, ${patientName}. Tell me the main symptom, when it started, how severe it is, your age group, and any important conditions or medicines. I cannot diagnose you or replace a clinician. Seek urgent care if symptoms are severe, sudden, rapidly worsening, or affect breathing, consciousness, speech, movement, or cause chest pain.`;
 };
 
 const hasCuratedGuidance = (message) =>
-  /(brain\s+(is\s+)?pain|head\s+pain|headache|pain\s+in\s+(my|the)\s+head|fever|high temperature|chills|hot body|nausea|vomit|diarrhea|loose motion|stomach upset|blood pressure|\bbp\b|hypertension)/i.test(message);
+  /(brain\s+(is\s+)?pain|head\s+pain|headache|pain\s+in\s+(my|the)\s+head|fever|high temperature|chills|hot body|nausea|vomit|diarrhea|loose motion|stomach upset|blood pressure|\bbp\b|hypertension|leg pain|pain in my leg|leg is paining|leg hurts|calf pain|thigh pain|knee pain|ankle pain)/i.test(message);
 
 const sanitizeMedicineAnalysis = (value) => {
   const text = sanitizeText(value, 5000);
