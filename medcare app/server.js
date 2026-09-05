@@ -46,12 +46,37 @@ const sanitizeAssistantReply = (value) => {
 };
 
 const getProfessionalFallback = (message, patientName) => {
-  if (/(brain pain|head pain|headache|pain in my head)/i.test(message)) {
-    return `I'm sorry you are experiencing this, ${patientName}. Head pain can have many causes, and I cannot determine the cause here.\n\nPlease seek emergency care now if it is sudden or severe, follows an injury, or comes with confusion, fainting, weakness or numbness on one side, trouble speaking, vision changes, fever with a stiff neck, or repeated vomiting.\n\nIf none of these warning signs are present, rest in a quiet room, drink water, and arrange a medical evaluation if the pain is new, severe, recurrent, or not improving.`;
+  if (/(brain\s+(is\s+)?pain|head\s+pain|headache|pain\s+in\s+(my|the)\s+head)/i.test(message)) {
+    return `I'm sorry you are experiencing this, ${patientName}. For mild head pain, rest in a quiet, dim room, drink water slowly, eat something light if you have not eaten, and try a cool cloth on your forehead or neck. Reduce screen brightness and avoid alcohol.
+
+Do not take more medicine than the label or your prescription allows, and check with a pharmacist before using a pain reliever if you have liver or kidney disease, ulcers, take blood thinners, are pregnant, or already use other medicines containing paracetamol or acetaminophen.
+
+Get emergency help now if the pain is sudden and extreme, follows a head injury, or comes with confusion, fainting, weakness or numbness on one side, trouble speaking, vision changes, fever with a stiff neck, seizure, or repeated vomiting. Arrange a medical visit if it is new, keeps returning, or is not improving.`;
   }
 
-  return `I'm sorry you are dealing with this, ${patientName}. I can provide general health information, but I cannot diagnose the cause. Please describe when it started, how severe it is, and any other symptoms. Seek urgent medical care if symptoms are severe, sudden, or worsening.`;
+  if (/(fever|high temperature|chills|hot body)/i.test(message)) {
+    return `For a mild fever, rest, drink frequent small amounts of water or oral rehydration solution, wear light clothing, and check your temperature. Do not use ice baths or take antibiotics unless prescribed.
+
+Follow the medicine label exactly and ask a pharmacist before using fever medicine for a child, during pregnancy, or with liver, kidney, or stomach problems. Seek urgent care for trouble breathing, confusion, a seizure, a stiff neck, a purple rash, severe dehydration, or a very high or persistent fever.`;
+  }
+
+  if (/(nausea|vomit|diarrhea|loose motion|stomach upset)/i.test(message)) {
+    return `For mild stomach upset, take small frequent sips of water or oral rehydration solution and eat simple foods when able. Avoid alcohol, greasy food, and large meals. Rest and wash your hands carefully.
+
+Seek medical care urgently for blood in vomit or stool, severe or worsening belly pain, fainting, confusion, signs of dehydration, or inability to keep fluids down. Contact a clinician if symptoms last more than a day in a child or several days in an adult.`;
+  }
+
+  if (/(blood pressure|\bbp\b|hypertension)/i.test(message)) {
+    return `For healthier blood pressure, take prescribed medicine exactly as directed, limit salty packaged foods, avoid tobacco, stay active within your ability, and keep a written record of readings taken while rested.
+
+Do not change or stop blood-pressure medicine without a clinician. If a reading is 180/120 or higher, repeat it after five minutes of rest. Get emergency help immediately if it remains that high or comes with chest pain, severe headache, shortness of breath, weakness, confusion, or vision changes.`;
+  }
+
+  return `I can help with temporary, general care guidance, ${patientName}. Tell me the main symptom, when it started, how severe it is, your age group, and any important conditions or medicines. I cannot diagnose you or replace a clinician. Seek urgent care if symptoms are severe, sudden, rapidly worsening, or affect breathing, consciousness, speech, movement, or cause chest pain.`;
 };
+
+const hasCuratedGuidance = (message) =>
+  /(brain\s+(is\s+)?pain|head\s+pain|headache|pain\s+in\s+(my|the)\s+head|fever|high temperature|chills|hot body|nausea|vomit|diarrhea|loose motion|stomach upset|blood pressure|\bbp\b|hypertension)/i.test(message);
 
 const sanitizeMedicineAnalysis = (value) => {
   const text = sanitizeText(value, 5000);
@@ -388,6 +413,13 @@ app.post('/api/chat', async (req, res) => {
       return res.json({
         success: true,
         reply: EMERGENCY_REPLY
+      });
+    }
+
+    if (hasCuratedGuidance(message)) {
+      return res.json({
+        success: true,
+        reply: `${getProfessionalFallback(message, patientName)}\n\nNote: This is general information, not a diagnosis.`
       });
     }
 
