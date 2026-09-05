@@ -42,6 +42,39 @@ const sanitizeAssistantReply = (value) => {
     .trim();
 };
 
+const sanitizeMedicineAnalysis = (value) => {
+  const text = sanitizeText(value, 5000);
+  const reportHeadings = [
+    'Identification',
+    'Active ingredient',
+    'Strength',
+    'Likely use',
+    'Warnings',
+    'Confidence',
+    'What is unreadable'
+  ];
+  const blockedLine = /(the user wants|analyze the image|apply the system|system instructions|refine for|final check|internal reasoning|chain[- ]of[- ]thought|constraints|prompt says|i have read|i'm using|no personalized dosage|specific headings|no mention|pharmacist verification statement|user says|user intent)/i;
+  const headingPattern = /(?:^|\n)\s*(?:\*+\s*)?(Identification|Active ingredient|Strength|Likely use|Warnings|Confidence|What is unreadable)\s*:?/gi;
+  const matches = [...text.matchAll(headingPattern)];
+  const start = matches.length > 0 ? matches[matches.length - 1].index : -1;
+
+  if (start < 0) return '';
+
+  const report = text
+    .slice(start)
+    .split('\n')
+    .filter((line) => !blockedLine.test(line.trim()))
+    .join('\n')
+    .replace(/\*+/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, 3000);
+
+  const hasIdentification = /\bIdentification\s*:/i.test(report);
+  const hasConfidence = /\bConfidence\s*:/i.test(report);
+  return hasIdentification && hasConfidence ? report : '';
+};
+
 const isEmergencyMessage = (value) =>
   /(chest pain|chest hurts|pain in (my|the) chest|difficulty breathing|can't breathe|cannot breathe|stroke symptoms|face drooping|severe allergic reaction|poisoning|snake bite)/i.test(value);
 
@@ -454,7 +487,7 @@ Read printed label text before identifying the medicine. Never identify medicine
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
         if (response.ok && text) {
-          replyText = sanitizeText(text);
+          replyText = sanitizeMedicineAnalysis(text);
           break;
         }
       } catch (error) {
