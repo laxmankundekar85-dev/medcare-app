@@ -31,6 +31,23 @@ const sanitizeText = (value, maxLength = 5000) => {
     .slice(0, maxLength);
 };
 
+const sanitizeAssistantReply = (value) => {
+  const blockedLine = /(user says|user intent|direct answer|simple language|no diagnosis|no mention|internal reasoning|checklist|draft \d|address the user|additional requirements|content requirements|disclaimer included|prompt|role:|persona:|constraint|status:|goal:)/i;
+
+  return sanitizeText(value, 4000)
+    .split('\n')
+    .filter((line) => !blockedLine.test(line.trim()))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
+
+const isEmergencyMessage = (value) =>
+  /(chest pain|chest hurts|pain in (my|the) chest|difficulty breathing|can't breathe|cannot breathe|stroke symptoms|face drooping|severe allergic reaction|poisoning|snake bite)/i.test(value);
+
+const EMERGENCY_REPLY =
+  'Chest pain can be serious. Call your local emergency number now or have someone take you to the nearest emergency department. Do not drive yourself. If you have severe breathing difficulty, fainting, sweating, nausea, or pain spreading to your arm, jaw, or back, seek emergency help immediately.';
+
 const safeJsonError = (res, status = 500) =>
   res.status(status).json({ success: false, error: PUBLIC_ERROR });
 
@@ -324,6 +341,13 @@ app.post('/api/chat', async (req, res) => {
       ? instructions.slice(0, 12).join('\n')
       : '';
 
+    if (isEmergencyMessage(message)) {
+      return res.json({
+        success: true,
+        reply: EMERGENCY_REPLY
+      });
+    }
+
     const systemPrompt = `You are Medcare AI, a cautious medical information assistant.
 Address the user as ${patientName} when appropriate.
 Active logged medicines: ${activeMeds}
@@ -351,7 +375,7 @@ ${clientInstructions}`;
 
     return res.json({
       success: true,
-      reply: `${sanitizeText(result.text)}\n\nNote: This is general information, not a diagnosis.`
+      reply: `${sanitizeAssistantReply(result.text)}\n\nNote: This is general information, not a diagnosis.`
     });
 
   } catch (error) {

@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../config';
 import { getUserId, getCacheKey } from '../utils/user';
 
 const REQUEST_TIMEOUT = 30000;
+const CHAT_HISTORY_KEY = getCacheKey('chat_history_v2');
 
 const SAFE_ERROR =
   'I could not process that request. Please try again. For urgent symptoms, contact emergency services or a healthcare professional.';
@@ -58,7 +59,7 @@ export default function Chatbot() {
   );
 
   const [messages, setMessages] = useState(() => {
-    const cachedMessages = readStorage(getCacheKey('chat_history'), null);
+    const cachedMessages = readStorage(CHAT_HISTORY_KEY, null);
 
     if (Array.isArray(cachedMessages) && cachedMessages.length > 0) {
       return cachedMessages;
@@ -84,7 +85,7 @@ export default function Chatbot() {
 
     try {
       localStorage.setItem(
-        getCacheKey('chat_history'),
+        CHAT_HISTORY_KEY,
         JSON.stringify(messages)
       );
     } catch {
@@ -184,7 +185,7 @@ export default function Chatbot() {
 
     try {
       localStorage.setItem(
-        getCacheKey('chat_history'),
+        CHAT_HISTORY_KEY,
         JSON.stringify(defaultMessage)
       );
     } catch {
