@@ -109,6 +109,54 @@ Call emergency services if breathing is severe or worsening, you cannot speak in
 Call emergency services for unconsciousness, seizure, severe confusion, repeated vomiting, deep or rapid breathing, or suspected diabetic emergency. Do not change diabetes medicine without the person's clinician.`;
   }
 
+  if (/(migraine)/i.test(message)) {
+    return `For a familiar, mild migraine, rest in a quiet dark room, drink water slowly, eat a light meal if you have not eaten, and use a cool cloth on your forehead. Reduce light, noise, and screen exposure. Use only medicine previously recommended for you and follow its label.
+
+Get urgent help for a sudden worst-ever headache, new weakness or numbness, confusion, fainting, seizure, vision or speech changes, fever with a stiff neck, repeated vomiting, or a headache after injury. Arrange a medical review if migraines are new, changing, frequent, or disabling.`;
+  }
+
+  if (/(acidity|acid reflux|heartburn|indigestion|gastric)/i.test(message)) {
+    return `For mild acidity or heartburn, eat smaller meals, avoid lying down for 2–3 hours after eating, and reduce triggers such as spicy or fatty food, alcohol, caffeine, and tobacco. Ask a pharmacist about a suitable short-term antacid.
+
+Seek urgent care for chest pressure, trouble breathing, vomiting blood, black stools, fainting, severe belly pain, or difficulty swallowing. Arrange a medical review if symptoms are frequent or persistent.`;
+  }
+
+  if (/(constipation|hard stool|cannot pass stool|not passing stool)/i.test(message)) {
+    return `For mild constipation, drink fluids, gradually add fibre from fruit, vegetables, beans, and whole grains, and walk gently if able. Do not strain excessively. Ask a pharmacist about a short-term laxative if needed.
+
+Get urgent care for severe belly pain, repeated vomiting, a swollen abdomen, blood in stool, fever, or inability to pass both stool and gas. Arrange a clinician visit if it is new, recurrent, or persistent.`;
+  }
+
+  if (/(urine infection|urinary infection|burning urination|painful urination|\buti\b|frequent urination)/i.test(message)) {
+    return `For possible urinary infection symptoms, drink normal amounts of water, do not hold urine, and arrange a urine test because antibiotics may be needed. Do not self-start leftover antibiotics.
+
+Seek urgent care for fever, chills, pain in the side or back, vomiting, confusion, pregnancy, blood in urine, or feeling very unwell. Get medical advice promptly if symptoms persist or worsen.`;
+  }
+
+  if (/(toothache|tooth pain|dental pain|gum pain)/i.test(message)) {
+    return `For temporary tooth pain relief, rinse gently with warm salt water, brush carefully, avoid very hot, cold, or sweet foods, and ask a pharmacist about a suitable pain reliever. Do not place aspirin directly on the gum.
+
+Arrange a dentist visit promptly. Seek urgent care for facial or neck swelling, fever, difficulty swallowing or breathing, pus, or inability to open the mouth.`;
+  }
+
+  if (/(rash|skin itching|itchy skin|eczema|skin allergy)/i.test(message)) {
+    return `For mild itching or rash, avoid the suspected trigger, use a fragrance-free moisturiser, keep the area cool, and avoid scratching. Ask a pharmacist about an appropriate treatment, especially for a child or during pregnancy.
+
+Get emergency help for swelling of the lips or tongue, trouble breathing, fainting, blistering skin, skin peeling, or a rapidly spreading rash. Seek medical advice for fever, pus, severe pain, or a rash that does not improve.`;
+  }
+
+  if (/(pink eye|red eye|eye irritation|eye pain|conjunctivitis)/i.test(message)) {
+    return `Avoid rubbing the eye, wash your hands, and do not share towels, cosmetics, or eye drops. A clean cool compress may soothe irritation. Remove contact lenses and do not use leftover antibiotic or steroid eye drops.
+
+Get urgent eye care for severe pain, vision changes, light sensitivity, injury, chemical exposure, marked swelling, or contact-lens-related redness. Arrange medical advice if redness or discharge persists.`;
+  }
+
+  if (/(period pain|menstrual cramps|menstrual pain|painful periods)/i.test(message)) {
+    return `For usual mild period cramps, rest, use a warm pack on the lower abdomen, drink fluids, and try gentle movement. Follow the label if using a pain reliever and ask a pharmacist first if pregnant, you have ulcers or kidney disease, or take blood thinners.
+
+Seek urgent care for fainting, severe sudden pain, very heavy bleeding, pregnancy with pain or bleeding, or fever. Arrange a medical review if pain is worsening, disabling, or different from usual.`;
+  }
+
   if (/(leg is broken|arm is broken|bone is broken|i broke my leg|i broke my arm|broken bone|broken arm|broken leg|fracture|bleeding|heavy bleeding|deep cut|fall|road accident|car accident|head injury|hit my head)/i.test(message)) {
     return `A suspected broken leg or other serious injury needs urgent medical assessment. Keep the person still, support the injured limb in the position found with cushions or a clean cloth, and do not try to straighten it or push a bone back in. Call emergency services if the limb looks deformed, the wound is open, or the person cannot move safely.
 
@@ -180,7 +228,7 @@ Arrange a medical visit if the pain is severe, keeps returning, causes numbness 
 };
 
 const hasCuratedGuidance = (message) =>
-  /(brain\s+(is\s+)?pain|head\s+pain|headache|head\s+ache|pain\s+in\s+(my|the)\s+head|fever|high temperature|chills|hot body|nausea|vomit|diarrhea|loose motion|stomach upset|blood pressure|\bbp\b|hypertension|leg pain|pain in my leg|leg is paining|leg hurts|calf pain|thigh pain|knee pain|ankle pain|cough|cold|runny nose|blocked nose|sore throat|throat pain|back pain|neck pain|muscle pain|body ache|sprain|strain|cut|minor burn|small burn|scrape|abrasion|wound|snake bite|snakebite|venomous bite|snake attack|dog bite|cat bite|animal bite|monkey bite|human bite|animal attack|dog attack|insect bite|bee sting|wasp sting|hornet sting|scorpion sting|spider bite|sting|allergy|allergic reaction|hives|face swelling|lip swelling|asthma|wheezing|breathless|shortness of breath|diabetes|low sugar|low blood sugar|hypoglycemia|high sugar|high blood sugar|bleeding|heavy bleeding|deep cut|fracture|broken bone|broken arm|broken leg|leg is broken|arm is broken|bone is broken|i broke my leg|i broke my arm|fall|road accident|car accident|head injury|hit my head|poison|poisoning|swallowed|overdose|chemical exposure|toxic)/i.test(message);
+  /(brain\s+(is\s+)?pain|head\s+pain|headache|head\s+ache|pain\s+in\s+(my|the)\s+head|fever|high temperature|chills|hot body|nausea|vomit|diarrhea|loose motion|stomach upset|blood pressure|\bbp\b|hypertension|leg pain|pain in my leg|leg is paining|leg hurts|calf pain|thigh pain|knee pain|ankle pain|cough|cold|runny nose|blocked nose|sore throat|throat pain|back pain|neck pain|muscle pain|body ache|sprain|strain|cut|minor burn|small burn|scrape|abrasion|wound|snake bite|snakebite|venomous bite|snake attack|dog bite|cat bite|animal bite|monkey bite|human bite|animal attack|dog attack|insect bite|bee sting|wasp sting|hornet sting|scorpion sting|spider bite|sting|allergy|allergic reaction|hives|face swelling|lip swelling|asthma|wheezing|breathless|shortness of breath|diabetes|low sugar|low blood sugar|hypoglycemia|high sugar|high blood sugar|migraine|acidity|acid reflux|heartburn|indigestion|gastric|constipation|hard stool|cannot pass stool|not passing stool|urine infection|urinary infection|burning urination|painful urination|\buti\b|frequent urination|toothache|tooth pain|dental pain|gum pain|rash|skin itching|itchy skin|eczema|skin allergy|pink eye|red eye|eye irritation|eye pain|conjunctivitis|period pain|menstrual cramps|menstrual pain|painful periods|bleeding|heavy bleeding|deep cut|fracture|broken bone|broken arm|broken leg|leg is broken|arm is broken|bone is broken|i broke my leg|i broke my arm|fall|road accident|car accident|head injury|hit my head|poison|poisoning|swallowed|overdose|chemical exposure|toxic)/i.test(message);
 
 const sanitizeMedicineAnalysis = (value) => {
   const text = sanitizeText(value, 5000);
