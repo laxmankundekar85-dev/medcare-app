@@ -4,7 +4,7 @@ import { API_BASE_URL } from '../config';
 import { getUserId, getCacheKey } from '../utils/user';
 
 const REQUEST_TIMEOUT = 30000;
-const CHAT_HISTORY_KEY = getCacheKey('chat_history_v3');
+const CHAT_HISTORY_KEY = getCacheKey('chat_history_v4');
 
 const SAFE_ERROR =
   'I could not process that request. Please try again. For urgent symptoms, contact emergency services or a healthcare professional.';

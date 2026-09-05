@@ -210,7 +210,7 @@ const sanitizeMedicineAnalysis = (value) => {
 };
 
 const isEmergencyMessage = (value) =>
-  /(chest pain|chest hurts|pain in (my|the) chest|difficulty breathing|can't breathe|cannot breathe|stroke symptoms|face drooping|severe allergic reaction|poisoning|snake bite)/i.test(value);
+  /(chest pain|chest hurts|pain in (my|the) chest|difficulty breathing|can't breathe|cannot breathe|stroke symptoms|face drooping)/i.test(value);
 
 const EMERGENCY_REPLY =
   'Chest pain can be serious. Call your local emergency number now or have someone take you to the nearest emergency department. Do not drive yourself. If you have severe breathing difficulty, fainting, sweating, nausea, or pain spreading to your arm, jaw, or back, seek emergency help immediately.';
