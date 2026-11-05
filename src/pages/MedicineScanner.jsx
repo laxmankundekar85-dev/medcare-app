@@ -32,12 +32,12 @@ const cleanResult = (value) => {
     .replace(/\n{3,}/g, '\n\n')
     .trim()
     .slice(0, 5000);
+};
 
 const isReliableResult = (value) => {
   if (!value) return false;
 
   return !/^identification\s*:?\s*not reliably identified\b/im.test(value);
-};
 };
 
 const fetchWithTimeout = async (url, options = {}) => {

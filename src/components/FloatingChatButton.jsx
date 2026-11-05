@@ -1,12 +1,9 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 
-const FloatingChatButton = () => {
-  const navigate = useNavigate();
 
+const FloatingChatButton = ({ onClick }) => {
   const handleOpenChat = () => {
-    // Navigates directly to your Chatbot tab/page
-    navigate('/chatbot'); 
+    if (onClick) onClick();
   };
 
   return (

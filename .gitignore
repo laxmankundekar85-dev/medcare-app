@@ -17,6 +17,8 @@ node_modules/
 serviceAccountKey.json
 medcare app/.env
 medcare app/serviceAccountKey.json
+users.json
+medcare app/users.json
 *.pem
 
 # ==========================================

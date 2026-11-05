@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, Check, Trash2 } from 'lucide-react';
+import { API_BASE_URL } from '../config';
+import { getUserId } from '../utils/user';
 
 export default function NotificationDropdown() {
   const [isOpen, setIsOpen] = useState(false);
@@ -7,7 +9,7 @@ export default function NotificationDropdown() {
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef(null);
 
-  const userId = "sample_firebase_user_id";
+  const userId = getUserId();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -29,11 +31,11 @@ export default function NotificationDropdown() {
     setLoading(true);
     try {
       const [medRes, apptRes, alarmRes, injRes, recRes] = await Promise.all([
-        fetch(`http://localhost:5000/api/medications/${userId}`),
-        fetch(`http://localhost:5000/api/appointments/${userId}`),
-        fetch(`http://localhost:5000/api/alarms/${userId}`),
-        fetch(`http://localhost:5000/api/injections/${userId}`),
-        fetch(`http://localhost:5000/api/records/${userId}`)
+        fetch(`${API_BASE_URL}/api/medications/${userId}`),
+        fetch(`${API_BASE_URL}/api/appointments/${userId}`),
+        fetch(`${API_BASE_URL}/api/alarms/${userId}`),
+        fetch(`${API_BASE_URL}/api/injections/${userId}`),
+        fetch(`${API_BASE_URL}/api/records/${userId}`)
       ]);
 
       const items = [];
