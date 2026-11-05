@@ -79,32 +79,32 @@ A full-stack, cross-platform healthcare companion application (Web and Android) 
 ## 🏗️ System Architecture
 
 ```mermaid
-flowchart TD
-    subgraph Clients["Frontend Clients"]
-        WEB["React Web App (Vite + Tailwind)"]
-        MOBILE["Android App (Capacitor 8)"]
+graph TD
+    subgraph Clients
+        WEB[React Web App - Vite and Tailwind]
+        MOBILE[Android App - Capacitor 8]
     end
 
-    subgraph Hosting["Deployments"]
-        VERCEL["Vercel (Frontend Web)"]
-        RENDER["Render (Express Backend)"]
+    subgraph Deployments
+        VERCEL[Vercel Frontend Hosting]
+        RENDER[Render Backend Service]
     end
 
-    subgraph Backend["Medcare Backend Server"]
-        API["Express.js REST API"]
-        AUTH_ROUTER["Firebase Admin SDK"]
-        EMAIL["Brevo / Nodemailer OTP"]
-        AI_SVC["Google Gemini API (Chat & Vision)"]
+    subgraph Backend
+        API[Express.js REST API]
+        AUTH_ROUTER[Firebase Admin SDK]
+        EMAIL[Brevo and Nodemailer OTP]
+        AI_SVC[Google Gemini AI Service]
     end
 
-    subgraph Database["Data Layer"]
-        MONGO[("MongoDB Atlas")]
-        FB_AUTH["Firebase Auth"]
+    subgraph Storage
+        MONGO[(MongoDB Atlas Database)]
+        FB_AUTH[(Firebase Authentication)]
     end
 
     WEB --> VERCEL
-    MOBILE --> API
     VERCEL --> API
+    MOBILE --> API
     RENDER --> API
 
     API --> MONGO
@@ -359,3 +359,4 @@ Medcare is compiled into a native Android app using **Capacitor 8**.
 ## 📄 License
 
 This project is licensed under the **ISC License**.
+
